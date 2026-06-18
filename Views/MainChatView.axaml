@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:vm="clr-namespace:SecureCryptoClient.ViewModels"
+             x:Class="SecureCryptoClient.MainChatView"
+             x:DataType="vm:MainChatViewModel">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="10">
+        
+        <!-- Верхняя панель (Заголовок) -->
+        <Border Grid.Row="0" Background="#E1E6EB" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+            <TextBlock Text="{Binding ChatHeader}" FontSize="14" FontWeight="Bold" Foreground="#243447" HorizontalAlignment="Center"/>
+        </Border>
+        
+        <!-- Панель выбора собеседника -->
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,0,0,15">
+            <TextBlock Grid.Column="0" Text="Кому написать:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#4A5B6C" Margin="0,0,10,0"/>
+            <TextBox Grid.Column="1" Watermark="Введите ник друга (например: bob)..." Text="{Binding Recipient, Mode=TwoWay}" Foreground="Black" Background="White"/>
+        </Grid>
+
+        <!-- Область сообщений (Светлый приятный фон как в Telegram) -->
+        <Border Grid.Row="2" Background="#E7EBF0" CornerRadius="8" BorderBrush="#D1D7DE" BorderThickness="1" Padding="5">
+            <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Messages}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <!-- Контейнер сообщения -->
+                            <Grid Margin="5,3">
+                                <Border CornerRadius="10" Padding="10,6" MaxWidth="280" HorizontalAlignment="Left" Background="White" BoxShadow="0 1 2 0 #20000000">
+                                    <StackPanel>
+                                        <!-- Автор сообщения (Всегда контрастный сине-серый) -->
+                                        <TextBlock Text="{Binding Sender}" FontSize="11" FontWeight="Bold" Foreground="#3A6D99" Margin="0,0,0,3"/>
+                                        <!-- Текст сообщения (Всегда строго черный и читаемый!) -->
+                                        <TextBlock Text="{Binding Text}" FontSize="14" Foreground="#111111" TextWrapping="Wrap"/>
+                                        <!-- Время отправки -->
+                                        <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm}}" FontSize="9" Foreground="#7A8A99" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Нижняя панель ввода сообщения -->
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,15,0,0">
+            <TextBox Grid.Column="0" Watermark="Введите секретное сообщение..." Text="{Binding TypedText}" Foreground="Black" Background="White" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Content="Отправить" Command="{Binding SendMessageAsync}" Background="#4A76A8" Foreground="White" FontWeight="Bold" Padding="15,8" Margin="8,0,0,0" VerticalAlignment="Center"/>
+        </Grid>
+        
+    </Grid>
+</UserControl>
