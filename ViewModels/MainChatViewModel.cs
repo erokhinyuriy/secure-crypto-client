@@ -4,6 +4,7 @@ using SecureCryptoClient.Services;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -64,6 +65,9 @@ public class MainChatViewModel : INotifyPropertyChanged
         get => _isChatSelected;
         set { _isChatSelected = value; OnPropertyChanged(); }
     }
+
+    public event Action? LogoutRequested;
+    public string MyUsername => _chatService.Username.ToUpper();
 
     public MainChatViewModel(CryptoChatService chatService, LocalSecureStorage localStorage)
     {
@@ -166,6 +170,36 @@ public class MainChatViewModel : INotifyPropertyChanged
         SelectedChat.LastMessage = textToSend;
 
         await _chatService.SendMessageAsync(SelectedChat.PartnerName, textToSend);
+    }
+
+    // ЛОГИКА ПУНКТА 2: ВЫХОД ИЗ УЧЕТНОЙ ЗАПИСИ
+    public void Logout()
+    {
+        // 1. Отписываемся от сетевых событий, чтобы не плодить утечки памяти
+        _chatService.MessageReceived -= OnIncomingMessageReceived;
+
+        // 2. Стираем крипто-ключи текущей сессии из оперативной памяти
+        typeof(CryptoChatService)
+            .GetField("_privateIdentityKey", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+            .SetValue(_chatService, null);
+
+        // 3. Удаляем файл автологина с диска, чтобы сбросить галочку "Запомнить меня"
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var tokenPath = Path.Combine(appData, "SecureCryptoMessenger", $"autologin_{_chatService.Username.ToLower().Trim()}.dat");
+            if (File.Exists(tokenPath))
+            {
+                File.Delete(tokenPath);
+            }
+        }
+        catch { }
+
+        // 4. Закрываем зашифрованный дескриптор LiteDB, очищая память файлов
+        _localStorage.Close();
+
+        // 5. Вызываем событие возврата на экран входа
+        LogoutRequested?.Invoke();
     }
 
     // Фоновый прием сообщения

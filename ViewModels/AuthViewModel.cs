@@ -43,6 +43,13 @@ public class AuthViewModel : INotifyPropertyChanged
         set { _isButtonsEnabled = value; OnPropertyChanged(); }
     }
 
+    private bool _rememberMe = false;
+    public bool RememberMe
+    {
+        get => _rememberMe;
+        set { _rememberMe = value; OnPropertyChanged(); }
+    }
+
     public AuthViewModel(CryptoChatService chatService, LocalSecureStorage localStorage, Action onAuthSuccess)
     {
         _chatService = chatService;
@@ -72,6 +79,18 @@ public class AuthViewModel : INotifyPropertyChanged
         if (isRegistered)
         {
             StatusMessage = "Подключение к защищенной сети...";
+
+            if (RememberMe && InitializedStorage != null)
+            {
+                // Сервер пустил пользователя — сохраняем его имя как последнего вошедшего в settings.json
+                LocalSecureStorage.SaveLastUser(Username);
+
+                if (RememberMe)
+                {
+                    InitializedStorage.SaveSecureAutologinToken(Username, MasterPassword);
+                }
+            }
+
             _onAuthSuccess();
         }
         else
@@ -101,6 +120,18 @@ public class AuthViewModel : INotifyPropertyChanged
         if (isPasswordCorrect)
         {
             InitializedStorage = storage; // Запоминаем открытую базу
+
+            if (RememberMe && InitializedStorage != null)
+            {
+                // Сервер пустил пользователя — сохраняем его имя как последнего вошедшего в settings.json
+                LocalSecureStorage.SaveLastUser(Username);
+
+                if (RememberMe)
+                {
+                    InitializedStorage.SaveSecureAutologinToken(Username, MasterPassword);
+                }
+            }
+
             StatusMessage = "Вход успешно выполнен.";
             _onAuthSuccess();
         }

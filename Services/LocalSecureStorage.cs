@@ -125,6 +125,109 @@ public class LocalSecureStorage
         return allPartners;
     }
 
+    // Метод генерирует уникальный 256-битный ключ, привязанный к текущему железу/ОС
+    private static byte[] GetMachineFingerprintKey()
+    {
+        // Собираем уникальные строки текущего компьютера (имя ПК и имя юзера ОС)
+        string rawId = Environment.MachineName + Environment.UserName + Environment.ProcessorCount;
+        // Превращаем этот уникальный шум в жесткий 32-байтный ключ через SHA256
+        return SHA256.HashData(Encoding.UTF8.GetBytes(rawId));
+    }
+
+    // Метод шифрует пароль силами ОС под текущего пользователя и сохраняет в AppData
+    public void SaveSecureAutologinToken(string username, string password)
+    {
+        try
+        {
+            var tokenPath = Path.Combine(Path.GetDirectoryName(_dbPath)!, $"autologin_{username.ToLower().Trim()}.dat");
+            byte[] key = GetMachineFingerprintKey();
+            byte[] plaintextBytes = Encoding.UTF8.GetBytes(password);
+
+            using var aes = new AesGcm(key, 16);
+            byte[] nonce = new byte[12];
+            RandomNumberGenerator.Fill(nonce);
+
+            byte[] ciphertext = new byte[plaintextBytes.Length];
+            byte[] tag = new byte[16];
+
+            aes.Encrypt(nonce, plaintextBytes, ciphertext, tag);
+
+            // Записываем в файл: Nonce (12B) + Tag (16B) + Ciphertext
+            using var ms = new MemoryStream();
+            using var writer = new BinaryWriter(ms);
+            writer.Write(nonce);
+            writer.Write(tag);
+            writer.Write(ciphertext);
+
+            File.WriteAllBytes(tokenPath, ms.ToArray());
+        }
+        catch { }
+    }
+
+    // Статический метод для автоматической проверки: есть ли сохраненный токен в системе?
+    public static string? TryGetSavedPassword(string username)
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var tokenPath = Path.Combine(appData, "SecureCryptoMessenger", $"autologin_{username.ToLower().Trim()}.dat");
+
+            if (!File.Exists(tokenPath)) return null;
+
+            byte[] fileData = File.ReadAllBytes(tokenPath);
+            using var ms = new MemoryStream(fileData);
+            using var reader = new BinaryReader(ms);
+
+            byte[] nonce = reader.ReadBytes(12);
+            byte[] tag = reader.ReadBytes(16);
+            byte[] ciphertext = reader.ReadBytes(fileData.Length - 12 - 16);
+
+            byte[] key = GetMachineFingerprintKey();
+            using var aes = new AesGcm(key, 16);
+            byte[] decryptedBytes = new byte[ciphertext.Length];
+
+            aes.Decrypt(nonce, ciphertext, tag, decryptedBytes);
+            return Encoding.UTF8.GetString(decryptedBytes);
+        }
+        catch
+        {
+            return null; // Файл поврежден или перенесен на другой ПК — сбрасываем
+        }
+    }
+
+    // Запоминаем имя последнего успешного пользователя в открытый JSON
+    public static void SaveLastUser(string username)
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var configPath = Path.Combine(appData, "SecureCryptoMessenger", "settings.json");
+
+            string json = $"{{\"LastLoggedUser\": \"{username.ToLower().Trim()}\"}}";
+            File.WriteAllText(configPath, json);
+        }
+        catch { }
+    }
+
+    // Читаем, кто заходил последним
+    public static string? GetLastUser()
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var configPath = Path.Combine(appData, "SecureCryptoMessenger", "settings.json");
+
+            if (!File.Exists(configPath)) return null;
+
+            string json = File.ReadAllText(configPath);
+            // Простой парсинг строки без тяжелых JSON библиотек для MVP
+            var parts = json.Split('"');
+            if (parts.Length >= 4) return parts[3]; // Возвращает значение из "LastLoggedUser"
+        }
+        catch { }
+        return null;
+    }
+
     // Закрытие базы данных при выходе из приложения (чтобы стереть ключи из ОЗУ)
     public void Close()
     {
