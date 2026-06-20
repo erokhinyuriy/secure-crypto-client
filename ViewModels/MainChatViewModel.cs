@@ -126,6 +126,8 @@ public class MainChatViewModel : INotifyPropertyChanged
     private async void InitializeSelectedChatAsync()
     {
         if (SelectedChat == null) return;
+
+        SelectedChat.UnreadCount = 0;
         var partner = SelectedChat.PartnerName;
 
         ChatHeader = $"Согласование сквозного шифрования с {partner}...";
@@ -197,13 +199,25 @@ public class MainChatViewModel : INotifyPropertyChanged
         // 3. ОБНОВЛЯЕМ ИНТЕРФЕЙС СТРОГО ДО СОХРАНЕНИЯ В БАЗУ ДАННЫХ
         Dispatcher.UIThread.Post(() =>
         {
+            // Ищем чат без учета регистра
             var existingChat = Chats.FirstOrDefault(c => string.Equals(c.PartnerName, sender, StringComparison.OrdinalIgnoreCase));
             bool wasSelected = SelectedChat != null && string.Equals(SelectedChat.PartnerName, sender, StringComparison.OrdinalIgnoreCase);
 
             if (existingChat == null)
             {
-                existingChat = new ChatSession { PartnerName = sender, LastMessage = decryptedText };
+                // ИСПРАВЛЕНО: Если нам пишет новый пользователь, создаем сессию чата
+                existingChat = new ChatSession
+                {
+                    PartnerName = sender,
+                    LastMessage = decryptedText
+                };
+
+                // Вставляем новый чат в самый верх панели диалогов
                 Chats.Insert(0, existingChat);
+
+                // КРИТИЧЕСКИЙ ФИКС: Принудительно уведомляем Avalonia UI, 
+                // что список чатов изменился и его нужно перерисовать прямо сейчас!
+                OnPropertyChanged(nameof(Chats));
             }
             else
             {
@@ -213,28 +227,30 @@ public class MainChatViewModel : INotifyPropertyChanged
                 {
                     Chats.Remove(existingChat);
                     Chats.Insert(0, existingChat);
+                    OnPropertyChanged(nameof(Chats)); // Уведомляем о перестановке чата наверх
                 }
             }
 
             if (wasSelected)
             {
-                // Этот вызов триггерит InitializeSelectedChatAsync, который очистит экран 
-                // и подгрузит СТАРУЮ историю с диска, где этого нового сообщения ЕЩЕ НЕТ.
                 SelectedChat = existingChat;
             }
 
             // Если этот чат сейчас открыт на экране — выводим сообщение
             if (SelectedChat != null && string.Equals(sender, SelectedChat.PartnerName, StringComparison.OrdinalIgnoreCase))
             {
-                // Проверка на дубликат (на всякий случай)
                 if (!Messages.Any(m => string.Equals(m.Text, incomingMsg.Text) && m.Timestamp == incomingMsg.Timestamp))
                 {
                     Messages.Add(incomingMsg);
                 }
             }
 
-            // 4. И ТОЛЬКО ТЕПЕРЬ, когда интерфейс полностью перерисован и зафиксирован, 
-            // мы со спокойной душой намертво записываем сообщение в LiteDB на диск!
+            if (SelectedChat == null || !string.Equals(sender, SelectedChat.PartnerName, StringComparison.OrdinalIgnoreCase))
+            {
+                existingChat.UnreadCount++;
+            }
+
+            // Сохраняем сообщение в LiteDB на диск
             _localStorage.SaveMessage(incomingMsg);
         });
     }

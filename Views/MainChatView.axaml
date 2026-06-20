@@ -5,6 +5,7 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              xmlns:vm="clr-namespace:SecureCryptoClient.ViewModels"
              xmlns:models="clr-namespace:SecureCryptoClient.Models"
+             xmlns:system="using:System"
              x:Class="SecureCryptoClient.MainChatView"
              x:DataType="vm:MainChatViewModel"
              Background="#182533">
@@ -25,11 +26,32 @@
                 <ListBox Grid.Row="1" ItemsSource="{Binding Chats}" SelectedItem="{Binding SelectedChat}" Background="Transparent" BorderThickness="0" Margin="0,5">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="models:ChatSession">
-                            <Grid RowDefinitions="Auto, Auto" Margin="5">
-                                <!-- Имя контакта -->
-                                <TextBlock Grid.Row="0" Text="{Binding PartnerName}" FontWeight="Bold" Foreground="White" FontSize="14"/>
-                                <!-- Превью последнего сообщения -->
-                                <TextBlock Grid.Row="1" Text="{Binding LastMessage}" Foreground="#7F91A4" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                            <!-- Grid разделен на две колонки: слева текст, справа счетчик -->
+                            <Grid ColumnDefinitions="*, Auto" Margin="5" Width="220">
+            
+                                <!-- Левая часть: Имя и превью текста -->
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="{Binding PartnerName}" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                    <TextBlock Text="{Binding LastMessage}" Foreground="#7F91A4" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                                </StackPanel>
+            
+                                <!-- Правая часть: Синий кружок количества непрочитанных (виден только если HasUnread = true) -->
+                                <Border Grid.Column="1" 
+                                        Background="#5288C1" 
+                                        CornerRadius="10" 
+                                        MinHeight="20" MinWidth="20" 
+                                        Padding="6,2" 
+                                        VerticalAlignment="Center" 
+                                        HorizontalAlignment="Right"
+                                        IsVisible="{Binding HasUnread}">
+                                    <TextBlock Text="{Binding UnreadCount}" 
+                                       FontSize="11" 
+                                       FontWeight="Bold" 
+                                       Foreground="White" 
+                                       HorizontalAlignment="Center" 
+                                       VerticalAlignment="Center"/>
+                                </Border>
+            
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
