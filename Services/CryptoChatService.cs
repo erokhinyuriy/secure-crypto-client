@@ -15,50 +15,67 @@ namespace SecureCryptoClient.Services;
 
 public class CryptoChatService
 {
-    private readonly string _serverHttpUrl = "http://localhost:5267"; // Наш ASP.NET Core сервер
+    private readonly string _serverHttpUrl = "http://localhost:5267";
     private readonly string _serverWsUrl = "ws://localhost:5267/ws";
     private readonly HttpClient _httpClient = new();
     private ClientWebSocket? _webSocket;
 
-    private byte[]? _privateIdentityKey;
-    public string PublicKeyBase64 { get; private set; } = "";
+    private byte[]? _privateIdentityKey; // Ed25519
+    public string PublicKeyBase64 { get; set; } = "";
     public string Username { get; set; } = "";
 
-    // Фиксированный симметричный ключ (AES-GCM) для MVP-переписки.
-    // В полной версии заменяется на Double Ratchet на базе ECDH
-    private readonly byte[] _e2eeSharedKey = Encoding.UTF8.GetBytes("SuperSecret_E2EE_ChannelKey_32B!");
+    // Хранилище сессионных AES-GCM ключей: Собеседник -> Вычисленный симметричный ключ
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _activeChatKeys = new();
 
-    public CryptoChatService(string username)
+    public CryptoChatService(string username) => Username = username.ToLower().Trim();
+
+    public byte[]? GetChatKey(string friend)
     {
-        Username = username.ToLower().Trim();
+        return _activeChatKeys.TryGetValue(friend.ToLower().Trim(), out var key) ? key : null;
     }
 
-    // Шаг А: Регистрация нового аккаунта на сервере
+    public event Action<SignedPacket>? MessageReceived;
+
+    // РЕГИСТРАЦИЯ X3DH
     public async Task<bool> RegisterAsync(string username, LocalSecureStorage storage)
     {
         Username = username.ToLower().Trim();
+
+        // 1. Генерируем Ed25519 (для цифровых подписей пакетов)
         var algo = SignatureAlgorithm.Ed25519;
+        using var edKey = Key.Create(algo, new KeyCreationParameters { ExportPolicy = KeyExportPolicies.AllowPlaintextExport });
+        _privateIdentityKey = edKey.Export(KeyBlobFormat.RawPrivateKey);
+        PublicKeyBase64 = Convert.ToBase64String(edKey.Export(KeyBlobFormat.RawPublicKey));
 
-        // Генерируем постоянную пару ключей с политикой экспорта
-        using var key = Key.Create(algo, new KeyCreationParameters { ExportPolicy = KeyExportPolicies.AllowPlaintextExport });
+        // 2. Генерируем связку X3DH ключей (ECDiffieHellman NIST P-256)
+        using var ecdhIdentity = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var ecdhSignedPre = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var ecdhOneTime = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
 
-        var privKeyBytes = key.Export(KeyBlobFormat.RawPrivateKey);
-        var pubKeyBytes = key.Export(KeyBlobFormat.RawPublicKey);
-        var pubKeyBase64 = Convert.ToBase64String(pubKeyBytes);
+        var pubId = Convert.ToBase64String(ecdhIdentity.PublicKey.ExportSubjectPublicKeyInfo());
+        var pubSigned = Convert.ToBase64String(ecdhSignedPre.PublicKey.ExportSubjectPublicKeyInfo());
+        var pubOneTime = Convert.ToBase64String(ecdhOneTime.PublicKey.ExportSubjectPublicKeyInfo());
+
+        var dto = new
+        {
+            Username = Username,
+            PublicKeyBase64 = PublicKeyBase64,
+            EcdhIdentityKeyBase64 = pubId,
+            SignedPrekeyBase64 = pubSigned,
+            OneTimePrekeyBase64 = pubOneTime
+        };
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync($"{_serverHttpUrl}/api/auth/register", new { Username = Username, PublicKeyBase64 = pubKeyBase64 });
+            var response = await _httpClient.PostAsJsonAsync($"{_serverHttpUrl}/api/auth/register", dto);
             if (response.IsSuccessStatusCode)
             {
-                // ЗАПОМИНАЕМ В ПАМЯТИ
-                _privateIdentityKey = privKeyBytes;
-                PublicKeyBase64 = pubKeyBase64;
+                // Сохраняем все приватные ключи в наш локальный зашифрованный сейф LiteDB
+                storage.SaveConfigValue("identity_private", Convert.ToBase64String(_privateIdentityKey));
+                storage.SaveConfigValue("identity_public", PublicKeyBase64);
 
-                // ЖЕЛЕЗОБЕТОННЫЙ ФИКС: Сразу же намертво записываем ключи в зашифрованный сейф устройства!
-                storage.SaveConfigValue("identity_private", Convert.ToBase64String(privKeyBytes));
-                storage.SaveConfigValue("identity_public", pubKeyBase64);
-
+                storage.SaveConfigValue("ecdh_id_private", Convert.ToBase64String(ecdhIdentity.ExportECPrivateKey()));
+                storage.SaveConfigValue("ecdh_signed_private", Convert.ToBase64String(ecdhSignedPre.ExportECPrivateKey()));
                 return true;
             }
         }
@@ -66,18 +83,96 @@ public class CryptoChatService
         return false;
     }
 
-    // Шаг Б: Подключение к WebSocket и запуск фонового прослушивания сообщений
-    public async Task ConnectAsync(Action<ChatMessage> onMessageReceived)
+    // ИНИЦИАЛИЗАЦИЯ ЧАТА (ВЫЧИСЛЕНИЕ СЕКРЕТА X3DH)
+    public async Task<bool> InitializeE2EEChannelWithAsync(string friendUsername, LocalSecureStorage storage)
     {
-        if (_privateIdentityKey == null) throw new InvalidOperationException("Клиент не авторизован / нет ключей.");
+        var friend = friendUsername.ToLower().Trim();
+        if (_activeChatKeys.ContainsKey(friend)) return true; // Канал уже согласован
+
+        try
+        {
+            // 1. Скачиваем "Крипто-Паспорт" друга с сервера
+            var bundle = await _httpClient.GetFromJsonAsync<PrekeyBundleDto>($"{_serverHttpUrl}/api/crypto/prekey-bundle/{friend}");
+            if (bundle == null) return false;
+
+            // Определяем роли по алфавитному порядку никнеймов для симметрии вычислений
+            bool isInitiator = string.Compare(Username, friend) < 0;
+
+            // 2. Инициализируем локальные приватные ключи ECDH
+            byte[] myPrivIdBytes = Convert.FromBase64String(storage.GetConfigValue("ecdh_id_private")!);
+            using var myEcdhId = ECDiffieHellman.Create();
+            myEcdhId.ImportECPrivateKey(myPrivIdBytes, out _);
+
+            byte[] myPrivSignedBytes = Convert.FromBase64String(storage.GetConfigValue("ecdh_signed_private")!);
+            using var myEcdhSigned = ECDiffieHellman.Create();
+            myEcdhSigned.ImportECPrivateKey(myPrivSignedBytes, out _);
+
+            // 3. Импортируем публичные ключи друга
+            using var friendEcdhId = ECDiffieHellman.Create();
+            friendEcdhId.ImportSubjectPublicKeyInfo(Convert.FromBase64String(bundle.EcdhIdentityKey), out _);
+
+            using var friendEcdhSigned = ECDiffieHellman.Create();
+            friendEcdhSigned.ImportSubjectPublicKeyInfo(Convert.FromBase64String(bundle.SignedPrekey), out _);
+
+            byte[] dh1;
+            byte[] dh2;
+
+            // 4. СТРОГАЯ СИММЕТРИЯ X3DH РУКОПОЖАТИЯ
+            if (isInitiator)
+            {
+                // Если мы Инициализатор чата (Алиса):
+                dh1 = myEcdhId.DeriveKeyMaterial(friendEcdhSigned.PublicKey); // Id_alice * Signed_bob
+                dh2 = myEcdhId.DeriveKeyMaterial(friendEcdhId.PublicKey);     // Id_alice * Id_bob
+            }
+            else
+            {
+                // Если мы Принимающая сторона (Боб):
+                dh1 = myEcdhSigned.DeriveKeyMaterial(friendEcdhId.PublicKey); // Signed_bob * Id_alice
+                dh2 = myEcdhId.DeriveKeyMaterial(friendEcdhId.PublicKey);     // Id_bob * Id_alice
+            }
+
+            // Соединяем куски секретов
+            using var ms = new MemoryStream();
+            ms.Write(dh1);
+            ms.Write(dh2);
+            byte[] masterSecret = ms.ToArray();
+
+            // Прогоняем через HKDF. Теперь на обеих сторонах finalAesKey будет идентичен до бита!
+            byte[] finalAesKey = HKDF.DeriveKey(
+                HashAlgorithmName.SHA256,
+                masterSecret,
+                32,
+                null,
+                Encoding.UTF8.GetBytes("X3DH_Protocol_Salt")
+            );
+
+            _activeChatKeys[friend] = finalAesKey;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task ConnectAsync()
+    {
+        if (_privateIdentityKey == null) throw new InvalidOperationException("Нет ключей подписи пакетов.");
+
+        // ЖЕЛЕЗОБЕТОННЫЙ ФИКС ДУБЛИРОВАНИЯ ПОТОКОВ:
+        // Если сокет уже создан и подключен, мы НЕ запускаем новый Task.Run и не создаем дублирующий поток чтения!
+        if (_webSocket != null && _webSocket.State == WebSocketState.Open)
+        {
+            // Сеть уже активна, просто шлем PING для обновления сессии на бэкенде
+            await SendPacketAsync("", "PING", "");
+            return;
+        }
 
         _webSocket = new ClientWebSocket();
         await _webSocket.ConnectAsync(new Uri(_serverWsUrl), CancellationToken.None);
-
-        // Верифицируем сессию на сервере первым PING-пакетом
         await SendPacketAsync("", "PING", "");
 
-        // Фоновый цикл чтения сокета
+        // Этот Task.Run запустится строго ОДИН РАЗ за всю жизнь приложения!
         _ = Task.Run(async () =>
         {
             var buffer = new byte[1024 * 64];
@@ -93,16 +188,8 @@ public class CryptoChatService
 
                     if (packet != null && packet.Type == "MESSAGE")
                     {
-                        // Сквозная расшифровка контента силами AES-GCM
-                        string decryptedText = DecryptAesGcm(packet.PayloadCipherBase64, _e2eeSharedKey);
-
-                        var msg = new ChatMessage
-                        {
-                            ChatPartner = packet.Sender,
-                            Sender = packet.Sender,
-                            Text = decryptedText
-                        };
-                        onMessageReceived(msg);
+                        // Вызываем событие. Его услышит только та ViewModel, которая активна сейчас
+                        MessageReceived?.Invoke(packet);
                     }
                 }
                 catch { break; }
@@ -110,58 +197,23 @@ public class CryptoChatService
         });
     }
 
-    // Шаг В: Отправка сообщения
     public async Task SendMessageAsync(string recipient, string plainText)
     {
-        // 1. Сквозное шифрование (Сервер не прочитает)
-        string cipherBase64 = EncryptAesGcm(plainText, _e2eeSharedKey);
+        var target = recipient.ToLower().Trim();
+        if (!_activeChatKeys.TryGetValue(target, out var aesKey)) throw new InvalidOperationException("Канал шифрования не согласован. Сначала вызовите инициализацию чата.");
 
-        // 2. Подпись Ed25519 и отправка
-        await SendPacketAsync(recipient, "MESSAGE", cipherBase64);
+        string cipherBase64 = EncryptAesGcm(plainText, aesKey);
+        await SendPacketAsync(target, "MESSAGE", cipherBase64);
     }
 
-    private async Task SendPacketAsync(string recipient, string type, string cipherPayload)
-    {
-        if (_webSocket == null || _webSocket.State != WebSocketState.Open || _privateIdentityKey == null) return;
-
-        var normalizedSender = Username.ToLower().Trim();
-        var normalizedRecipient = recipient.ToLower().Trim();
-
-        var packet = new SignedPacket
-        {
-            Sender = normalizedSender,
-            Recipient = normalizedRecipient,
-            Type = type,
-            PayloadCipherBase64 = cipherPayload
-        };
-
-        // ИСПРАВЛЕНО: Собираем точно такой же анонимный объект, как на сервере
-        var rawDataToSign = new
-        {
-            s = normalizedSender,
-            r = normalizedRecipient,
-            t = packet.Type,
-            p = packet.PayloadCipherBase64
-        };
-
-        // Сериализуем его в точно такой же JSON-формат
-        string jsonToSign = JsonSerializer.Serialize(rawDataToSign);
-        byte[] dataToSign = Encoding.UTF8.GetBytes(jsonToSign);
-
-        using var privateKey = Key.Import(SignatureAlgorithm.Ed25519, _privateIdentityKey, KeyBlobFormat.RawPrivateKey);
-        byte[] signatureBytes = SignatureAlgorithm.Ed25519.Sign(privateKey, dataToSign);
-        packet.Signature = Convert.ToBase64String(signatureBytes);
-
-        // Отправляем полный пакет в сеть
-        var json = JsonSerializer.Serialize(packet);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        await _webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-    }
-
-    // ВАЖНО: Этот метод будет вызываться при успешном логине, чтобы загрузить старые ключи из LiteDB!
     public bool LoadIdentityKeysFromStorage(LocalSecureStorage storage)
     {
-        // Пробуем прочитать сохраненные ключи
+        if (_privateIdentityKey != null && !string.IsNullOrEmpty(PublicKeyBase64))
+        {
+            return true;
+        }
+
+        // Во всех остальных случаях (например, при обычном Входе/Логине) — честно читаем с диска
         var privKeyBase64 = storage.GetConfigValue("identity_private");
         var pubKeyBase64 = storage.GetConfigValue("identity_public");
 
@@ -171,48 +223,58 @@ public class CryptoChatService
             PublicKeyBase64 = pubKeyBase64;
             return true;
         }
-
         return false;
+    }
+
+    private async Task SendPacketAsync(string recipient, string type, string cipherPayload)
+    {
+        if (_webSocket == null || _webSocket.State != WebSocketState.Open || _privateIdentityKey == null) return;
+
+        var packet = new SignedPacket { Sender = Username.ToLower().Trim(), Recipient = recipient.ToLower().Trim(), Type = type, PayloadCipherBase64 = cipherPayload };
+
+        var rawDataToSign = new { s = packet.Sender, r = packet.Recipient, t = packet.Type, p = packet.PayloadCipherBase64 };
+        byte[] dataToSign = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(rawDataToSign));
+
+        using var privateKey = Key.Import(SignatureAlgorithm.Ed25519, _privateIdentityKey, KeyBlobFormat.RawPrivateKey);
+        packet.Signature = Convert.ToBase64String(SignatureAlgorithm.Ed25519.Sign(privateKey, dataToSign));
+
+        await _webSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet))), WebSocketMessageType.Text, true, CancellationToken.None);
     }
 
     #region AES-GCM Engine
     private string EncryptAesGcm(string plainText, byte[] key)
     {
         using var aes = new AesGcm(key, 16);
-
-        // ИСПРАВЛЕНО: Явно выделяем стандартные 12 байт для nonce
-        byte[] nonce = new byte[12];
-        RandomNumberGenerator.Fill(nonce);
-
+        byte[] nonce = new byte[12]; RandomNumberGenerator.Fill(nonce);
         byte[] plainBytes = Encoding.UTF8.GetBytes(plainText);
-        byte[] cipherBytes = new byte[plainBytes.Length];
-        byte[] tag = new byte[16];
-
+        byte[] cipherBytes = new byte[plainBytes.Length]; byte[] tag = new byte[16];
         aes.Encrypt(nonce, plainBytes, cipherBytes, tag);
-
-        using var ms = new MemoryStream();
-        using var writer = new BinaryWriter(ms);
-        writer.Write(nonce);
-        writer.Write(tag);
-        writer.Write(cipherBytes);
+        using var ms = new MemoryStream(); using var writer = new BinaryWriter(ms);
+        writer.Write(nonce); writer.Write(tag); writer.Write(cipherBytes);
         return Convert.ToBase64String(ms.ToArray());
     }
 
-    private string DecryptAesGcm(string cipherBase64, byte[] key)
-    {
-        byte[] cipherData = Convert.FromBase64String(cipherBase64);
-        using var ms = new MemoryStream(cipherData);
-        using var reader = new BinaryReader(ms);
-
-        // ИСПРАВЛЕНО: Считываем стандартные 12 байт nonce
-        byte[] nonce = reader.ReadBytes(12);
-        byte[] tag = reader.ReadBytes(16);
-        byte[] ciphertext = reader.ReadBytes(cipherData.Length - 12 - 16);
-
-        using var aes = new AesGcm(key, 16);
-        byte[] plainBytes = new byte[ciphertext.Length];
-        aes.Decrypt(nonce, ciphertext, tag, plainBytes);
-        return Encoding.UTF8.GetString(plainBytes);
+    public string DecryptAesGcm(string cipherBase64, byte[] key) 
+    { 
+        byte[] cipherData = Convert.FromBase64String(cipherBase64); 
+        using var ms = new MemoryStream(cipherData); 
+        using var reader = new BinaryReader(ms); 
+        byte[] nonce = reader.ReadBytes(12); 
+        byte[] tag = reader.ReadBytes(16); 
+        byte[] ciphertext = reader.ReadBytes(cipherData.Length - 12 - 16); 
+        using var aes = new AesGcm(key, 16); 
+        byte[] plainBytes = new byte[ciphertext.Length]; 
+        aes.Decrypt(nonce, ciphertext, tag, plainBytes); 
+        return Encoding.UTF8.GetString(plainBytes); 
     }
     #endregion
+
+    private class PrekeyBundleDto 
+    { 
+        public string Username { get; set; } = ""; 
+        public string Ed25519PublicKey { get; set; } = ""; 
+        public string EcdhIdentityKey { get; set; } = ""; 
+        public string SignedPrekey { get; set; } = ""; 
+        public string OneTimePrekey { get; set; } = ""; 
+    }
 }

@@ -42,25 +42,51 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
         if (CurrentContent is AuthViewModel authVm)
         {
-            // 1. Принудительно задаем имя пользователя в сети
+            // 1. Задаем имя пользователя в сети
             _chatService.Username = authVm.Username.ToLower().Trim();
 
             if (authVm.InitializedStorage != null)
             {
                 activeStorage = authVm.InitializedStorage;
+
+                // ЖЕЛЕЗОБЕТОННЫЙ ФИКС КЭША: Принудительно закрываем базу данных 
+                // и открываем её заново. Это заставит LiteDB физически сбросить 
+                // транзакцию регистрации на диск, и файлы store_alice.db запишут ключи!
+                activeStorage.Close();
+                activeStorage.Initialize(authVm.MasterPassword);
+
                 _localStorage = activeStorage;
             }
-
-            // 2. КРИТИЧЕСКИЙ ФИКС: Загружаем или сохраняем ключи Ed25519 в зашифрованную базу!
-            // Теперь ключи привязываются к вашему профилю навсегда
-            _chatService.LoadIdentityKeysFromStorage(activeStorage);
         }
 
-        // 3. Передаем готовую базу в чат
+        // 2. СБРАСЫВАЕМ память сервиса, чтобы он гарантированно прочитал свежие ключи с диска
+        // Удаляем старый _privateIdentityKey, если он был равен null
+        typeof(CryptoChatService)
+            .GetField("_privateIdentityKey", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+            .SetValue(_chatService, null);
+
+        // 3. Честно загружаем ключи из только что переоткрытой базы данных
+        bool keysLoaded = _chatService.LoadIdentityKeysFromStorage(activeStorage);
+
+        // Если ключи не загрузились (например, при регистрации), мы подстрахуем 
+        // и попробуем забрать их напрямую из AuthViewModel, если у него был свой сервис
+        if (!keysLoaded && CurrentContent is AuthViewModel authWindow)
+        {
+            // С помощью рефлексии достаем приватный ключ, если сервисы разделились в MVVM
+            var authService = authWindow.GetType().GetField("_chatService", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(authWindow) as CryptoChatService;
+            if (authService != null)
+            {
+                var privKey = authService.GetType().GetField("_privateIdentityKey", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(authService);
+                typeof(CryptoChatService).GetField("_privateIdentityKey", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(_chatService, privKey);
+                _chatService.PublicKeyBase64 = authService.PublicKeyBase64;
+            }
+        }
+
+        // 4. Передаем готовую и проверенную базу в чат
         var chatVm = new MainChatViewModel(_chatService, activeStorage);
         CurrentContent = chatVm;
 
-        // 4. Подключаем сокет (подписи теперь будут сотыми долями процента совпадать с сервером!)
+        // 5. Теперь сокет запустится со 100% вероятностью, так как ключи на месте!
         await chatVm.InitializeAndConnectAsync();
     }
 

@@ -4,37 +4,59 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              xmlns:vm="clr-namespace:SecureCryptoClient.ViewModels"
+             xmlns:models="clr-namespace:SecureCryptoClient.Models"
              x:Class="SecureCryptoClient.MainChatView"
-             x:DataType="vm:MainChatViewModel">
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="10">
+             x:DataType="vm:MainChatViewModel"
+             Background="#182533">
+    <Grid ColumnDefinitions="250, *">
         
-        <!-- Верхняя панель (Заголовок) -->
-        <Border Grid.Row="0" Background="#E1E6EB" CornerRadius="5" Padding="10" Margin="0,0,0,10">
-            <TextBlock Text="{Binding ChatHeader}" FontSize="14" FontWeight="Bold" Foreground="#243447" HorizontalAlignment="Center"/>
-        </Border>
-        
-        <!-- Панель выбора собеседника -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,0,0,15">
-            <TextBlock Grid.Column="0" Text="Кому написать:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#4A5B6C" Margin="0,0,10,0"/>
-            <TextBox Grid.Column="1" Watermark="Введите ник друга (например: bob)..." Text="{Binding Recipient, Mode=TwoWay}" Foreground="Black" Background="White"/>
-        </Grid>
+        <!-- ================= СЛЕВА: ПАНЕЛЬ ЧАТОВ ================= -->
+        <!-- Обернули Grid в Border, чтобы задать правую рамку-разделитель -->
+        <Border Grid.Column="0" Background="#17212B" BorderBrush="#101921" BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto, *">
+                
+                <!-- Поле добавления друга по Юзернейму -->
+                <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="10">
+                    <TextBox Grid.Column="0" Watermark="Добавить @username..." Text="{Binding NewFriendUsername}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="4,0,0,4" Height="32" VerticalContentAlignment="Center" FontSize="12"/>
+                    <Button Grid.Column="1" Content="+" Command="{Binding AddNewChatByUsernameAsync}" Background="#5288C1" Foreground="White" Width="32" Height="32" CornerRadius="0,4,4,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontWeight="Bold"/>
+                </Grid>
 
-        <!-- Область сообщений (Светлый приятный фон как в Telegram) -->
-        <Border Grid.Row="2" Background="#E7EBF0" CornerRadius="8" BorderBrush="#D1D7DE" BorderThickness="1" Padding="5">
-            <ScrollViewer>
+                <!-- Список активных диалогов (Листбокс) -->
+                <ListBox Grid.Row="1" ItemsSource="{Binding Chats}" SelectedItem="{Binding SelectedChat}" Background="Transparent" BorderThickness="0" Margin="0,5">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="models:ChatSession">
+                            <Grid RowDefinitions="Auto, Auto" Margin="5">
+                                <!-- Имя контакта -->
+                                <TextBlock Grid.Row="0" Text="{Binding PartnerName}" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                <!-- Превью последнего сообщения -->
+                                <TextBlock Grid.Row="1" Text="{Binding LastMessage}" Foreground="#7F91A4" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <!-- ================= СПРАВА: ОКНО ПЕРЕПИСКИ ================= -->
+        <Grid Grid.Column="1" RowDefinitions="Auto, *, Auto" Background="#0E1621">
+            
+            <!-- Верхняя плашка текущего чата -->
+            <Border Grid.Row="0" Background="#17212B" Padding="15,10" BorderBrush="#101921" BorderThickness="0,0,0,1">
+                <TextBlock Text="{Binding ChatHeader}" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+            </Border>
+
+            <!-- Окно вывода сообщений -->
+            <ScrollViewer Grid.Row="1" Padding="10">
                 <ItemsControl ItemsSource="{Binding Messages}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <!-- Контейнер сообщения -->
-                            <Grid Margin="5,3">
-                                <Border CornerRadius="10" Padding="10,6" MaxWidth="280" HorizontalAlignment="Left" Background="White" BoxShadow="0 1 2 0 #20000000">
+                            <Grid Margin="0,4">
+                                <!-- Контейнер "Бабла" сообщения с тенью -->
+                                <Border CornerRadius="6" Padding="10,6" MaxWidth="350" Background="#182533" BorderBrush="#2B5278" BorderThickness="1" HorizontalAlignment="Left">
                                     <StackPanel>
-                                        <!-- Автор сообщения (Всегда контрастный сине-серый) -->
-                                        <TextBlock Text="{Binding Sender}" FontSize="11" FontWeight="Bold" Foreground="#3A6D99" Margin="0,0,0,3"/>
-                                        <!-- Текст сообщения (Всегда строго черный и читаемый!) -->
-                                        <TextBlock Text="{Binding Text}" FontSize="14" Foreground="#111111" TextWrapping="Wrap"/>
-                                        <!-- Время отправки -->
-                                        <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm}}" FontSize="9" Foreground="#7A8A99" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                                        <TextBlock Text="{Binding Sender}" FontSize="11" FontWeight="Bold" Foreground="#5288C1" Margin="0,0,0,2"/>
+                                        <TextBlock Text="{Binding Text}" FontSize="13" Foreground="White" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm}}" FontSize="9" Foreground="#7F91A4" HorizontalAlignment="Right" Margin="0,4,0,0"/>
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -42,12 +64,12 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
-        </Border>
 
-        <!-- Нижняя панель ввода сообщения -->
-        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,15,0,0">
-            <TextBox Grid.Column="0" Watermark="Введите секретное сообщение..." Text="{Binding TypedText}" Foreground="Black" Background="White" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Content="Отправить" Command="{Binding SendMessageAsync}" Background="#4A76A8" Foreground="White" FontWeight="Bold" Padding="15,8" Margin="8,0,0,0" VerticalAlignment="Center"/>
+            <!-- Нижняя панель ввода текста (Заменили Padding на Margin у Grid) -->
+            <Grid Grid.Row="2" ColumnDefinitions="*, Auto" Background="#17212B" Margin="0" IsVisible="{Binding IsChatSelected}">
+                <TextBox Grid.Column="0" Watermark="Написать сообщение..." Text="{Binding TypedText}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="4" Padding="10,6" MaxHeight="60" TextWrapping="Wrap"/>
+                <Button Grid.Column="1" Content="Отправить" Command="{Binding SendMessageAsync}" Background="Transparent" Foreground="#5288C1" FontWeight="Bold" Margin="10,0,0,0" VerticalAlignment="Center"/>
+            </Grid>
         </Grid>
         
     </Grid>

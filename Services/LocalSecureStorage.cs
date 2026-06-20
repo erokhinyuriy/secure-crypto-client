@@ -1,10 +1,11 @@
-﻿using System;
+﻿using LiteDB;
+using SecureCryptoClient.Models;
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using LiteDB;
-using SecureCryptoClient.Models;
 
 namespace SecureCryptoClient.Services;
 
@@ -20,7 +21,7 @@ public class LocalSecureStorage
         var appDir = Path.Combine(appData, "SecureCryptoMessenger");
         Directory.CreateDirectory(appDir);
 
-        // Теперь у каждого пользователя будет своя ЛИЧНАЯ база и соль на диске
+        // ИМЯ ФАЙЛА ДОЛЖНО СТРОГО СОДЕРЖАТЬ ИМЯ ВОШЕДШЕГО ЮЗЕРА
         _dbPath = Path.Combine(appDir, $"store_{username.ToLower().Trim()}.db");
     }
 
@@ -85,7 +86,7 @@ public class LocalSecureStorage
         var collection = _database.GetCollection<ChatMessage>("messages");
         var partnerNormalized = chatPartner.ToLower().Trim();
 
-        // Быстрая выборка по индексу
+        // СТРОГАЯ ФИЛЬТРАЦИЯ: возвращаем только те сообщения, где ChatPartner равен нужному другу!
         return collection.Find(x => x.ChatPartner == partnerNormalized);
     }
 
@@ -107,6 +108,21 @@ public class LocalSecureStorage
 
         var doc = collection.FindById(key);
         return doc?["Value"].AsString;
+    }
+
+    // Метод сканирует всю локальную историю сообщений и возвращает список уникальных имен собеседников
+    public IEnumerable<string> GetUniqueChatPartners()
+    {
+        if (_database == null) throw new InvalidOperationException("База данных не инициализирована.");
+
+        var collection = _database.GetCollection<ChatMessage>("messages");
+
+        // Вытаскиваем только поле ChatPartner из всех сообщений и убираем дубликаты
+        var allPartners = collection.FindAll()
+                                    .Select(x => x.ChatPartner.ToLower().Trim())
+                                    .Distinct();
+
+        return allPartners;
     }
 
     // Закрытие базы данных при выходе из приложения (чтобы стереть ключи из ОЗУ)
