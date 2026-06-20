@@ -11,6 +11,10 @@ public class ChatSession : INotifyPropertyChanged
 
     public string PartnerName { get; set; } = "";
 
+    // Первой буква имени друга для круглой аватарки в списке чатов
+    public string Initials => string.IsNullOrEmpty(PartnerName) ? "?" : PartnerName[..1].ToUpper();
+
+
     public string LastMessage
     {
         get => _lastMessage;

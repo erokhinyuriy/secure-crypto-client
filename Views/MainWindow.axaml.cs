@@ -8,5 +8,12 @@ namespace SecureCryptoClient.Views
         {
             InitializeComponent();
         }
+
+        public void ExpandForChat()
+        {
+            Width = 850;   // Комфортная ширина для двух колонок в стиле Telegram
+            Height = 600;  // Комфортная высота, чтобы сообщения не спрессовывались
+            WindowStartupLocation = WindowStartupLocation.CenterScreen; // Центрируем обновленное окно
+        }
     }
 }

@@ -146,6 +146,8 @@ public class MainChatViewModel : INotifyPropertyChanged
         var history = _localStorage.GetChatHistory(partner);
         foreach (var msg in history.OrderBy(m => m.Timestamp))
         {
+            // На лету сверяем автора из базы данных с текущим ником в сессии
+            msg.IsMe = string.Equals(msg.Sender, _chatService.Username, StringComparison.OrdinalIgnoreCase);
             Messages.Add(msg);
         }
     }
@@ -162,7 +164,8 @@ public class MainChatViewModel : INotifyPropertyChanged
         {
             ChatPartner = SelectedChat.PartnerName,
             Sender = _chatService.Username,
-            Text = textToSend
+            Text = textToSend,
+            IsMe = true
         };
 
         _localStorage.SaveMessage(msg);
@@ -227,7 +230,8 @@ public class MainChatViewModel : INotifyPropertyChanged
             ChatPartner = sender,
             Sender = sender,
             Text = decryptedText,
-            Timestamp = DateTime.UtcNow
+            Timestamp = DateTime.UtcNow,
+            IsMe = false
         };
 
         // 3. ОБНОВЛЯЕМ ИНТЕРФЕЙС СТРОГО ДО СОХРАНЕНИЯ В БАЗУ ДАННЫХ
