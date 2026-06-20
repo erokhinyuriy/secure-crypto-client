@@ -57,46 +57,30 @@
         <!-- ================= СПРАВА: ОКНО ПЕРЕПИСКИ ================= -->
         <!-- ИСПРАВЛЕНО: Заменили Grid на DockPanel со свойством LastChildFill. 
              Теперь ScrollViewer гарантированно зажат между заголовком и вводом! -->
-        <DockPanel Grid.Column="1" Background="#0E1621" LastChildFill="True">
+        <Grid Grid.Column="1" RowDefinitions="Auto, *, Auto" Background="#0E1621">
             
-            <!-- 1. Верхний заголовок (Прижат к верху) -->
-            <Border DockPanel.Dock="Top" Background="#17212B" Padding="20,12" BorderBrush="#101921" BorderThickness="0,0,0,1">
+            <!-- Строка 0: Верхний заголовок текущего чата -->
+            <Border Grid.Row="0" Background="#17212B" Padding="20,12" BorderBrush="#101921" BorderThickness="0,0,0,1">
                 <TextBlock Text="{Binding ChatHeader}" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
             </Border>
 
-            <!-- 2. Нижняя панель ввода (Прижата к низу) -->
-            <!-- Она объявляется ВТОРОЙ, жестко отсекая нижнюю границу окна от прокрутки! -->
-            <Border DockPanel.Dock="Bottom" 
-                    x:Name="InputPanelBorder" 
-                    Background="#17212B" 
-                    Padding="12,10" 
-                    BorderBrush="#101921" 
-                    BorderThickness="0,1,0,0"
-                    IsVisible="{Binding IsChatSelected}">
-                <Grid ColumnDefinitions="*, Auto" Background="#17212B">
-                    <TextBox Grid.Column="0" Watermark="Написать сообщение..." Text="{Binding TypedText}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="6" Padding="12,8" MaxHeight="80" TextWrapping="Wrap" FontSize="13"/>
-                    <Button Grid.Column="1" Content="Отправить" Command="{Binding SendMessageAsync}" Background="Transparent" Foreground="#5288C1" FontSize="14" FontWeight="Bold" Margin="12,0,4,0" VerticalAlignment="Center"/>
-                </Grid>
-            </Border>
-
-            <!-- 3. Лента сообщений (Заполняет оставшееся пространство) -->
-            <!-- Так как она идет ПОСЛЕДНЕЙ, её физический размер автоматически 
-                 заканчивается НАД панелью ввода текста. Наложение исключено! -->
+            <!-- Строка 1: Лента сообщений -->
             <ScrollViewer x:Name="ChatScrollViewer" 
+                          Grid.Row="1" 
                           Padding="14,10,14,-20" 
                           VerticalScrollBarVisibility="Auto" 
                           HorizontalScrollBarVisibility="Disabled"
                           ClipToBounds="True">
                 <ItemsControl ItemsSource="{Binding Messages}" ClipToBounds="True">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="models:ChatMessage">
+                        <DataTemplate DataType="{x:Type models:ChatMessage}">
                             <Grid ColumnDefinitions="Auto, *" HorizontalAlignment="Left" Margin="0,5">
                                 <Panel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
                                     <Border Width="30" Height="30" CornerRadius="15" BorderThickness="2" IsVisible="{Binding IsMe}">
                                         <Border.BorderBrush>
                                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                                                 <GradientStop Color="#8A2BE2" Offset="0.0"/>
-                                                <GradientStop Color="#1E90FF" Offset="1.0"/>
+                                                <GradientStop Color="#00FFFF" Offset="1.0"/>
                                             </LinearGradientBrush>
                                         </Border.BorderBrush>
                                         <Border Background="#1A2C3B" CornerRadius="13">
@@ -119,7 +103,45 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+
+            <!-- КРУГЛАЯ КНОПКА ДЛЯ СКРОЛЛА ВНИЗ В СТИЛЕ TELEGRAM -->
+            <!-- ИСПРАВЛЕНО: Кнопка лежит строго в Grid.Row="1" поверх скроллбара. 
+                 Она больше не сжимает окна, а парит в углу за счет Margin -->
+            <Button Name="ScrollDownBtn"
+                    Grid.Row="1"
+                    IsVisible="{Binding IsScrollButtonVisible}"
+                    Width="38" Height="38" 
+                    CornerRadius="19" 
+                    Background="#17212B" 
+                    BorderBrush="#2B5278" 
+                    BorderThickness="1"
+                    HorizontalAlignment="Right" 
+                    VerticalAlignment="Bottom" 
+                    Margin="0,0,25,20">
+                <TextBlock Text="▼" 
+                           Foreground="#5288C1" 
+                           FontSize="13" 
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center" 
+                           VerticalAlignment="Center"
+                           Margin="0,1,0,0"/>
+            </Button>
+
+            <!-- Строка 2: Нижняя панель ввода текста -->
+            <Border x:Name="InputPanelBorder" 
+                    Grid.Row="2" 
+                    Background="#17212B" 
+                    Padding="12,10" 
+                    VerticalAlignment="Bottom"
+                    BorderBrush="#101921" 
+                    BorderThickness="0,1,0,0"
+                    IsVisible="{Binding IsChatSelected}">
+                <Grid ColumnDefinitions="*, Auto" Background="#17212B">
+                    <TextBox Grid.Column="0" Watermark="Написать сообщение..." Text="{Binding TypedText}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="6" Padding="12,8" MaxHeight="80" TextWrapping="Wrap" FontSize="13"/>
+                    <Button Grid.Column="1" Content="Отправить" Command="{Binding SendMessageAsync}" Background="Transparent" Foreground="#5288C1" FontSize="14" FontWeight="Bold" Margin="12,0,4,0" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
             
-        </DockPanel>
+        </Grid> <!-- Конец правой панели -->
     </Grid>
 </UserControl>

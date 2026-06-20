@@ -66,6 +66,15 @@ public class MainChatViewModel : INotifyPropertyChanged
         set { _isChatSelected = value; OnPropertyChanged(); }
     }
 
+    private bool _isScrollButtonVisible = false;
+
+    // Видимость круглой кнопки скролла вниз
+    public bool IsScrollButtonVisible
+    {
+        get => _isScrollButtonVisible;
+        set { _isScrollButtonVisible = value; OnPropertyChanged(); }
+    }
+
     public event Action? LogoutRequested;
     public string MyUsername => _chatService.Username.ToUpper();
 
@@ -173,6 +182,8 @@ public class MainChatViewModel : INotifyPropertyChanged
         SelectedChat.LastMessage = textToSend;
 
         await _chatService.SendMessageAsync(SelectedChat.PartnerName, textToSend);
+
+        IsScrollButtonVisible = false;
     }
 
     // ЛОГИКА ПУНКТА 2: ВЫХОД ИЗ УЧЕТНОЙ ЗАПИСИ
