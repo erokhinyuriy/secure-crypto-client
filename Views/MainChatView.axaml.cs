@@ -66,10 +66,18 @@ public partial class MainChatView : UserControl
         {
             try
             {
+                // 1. Проверяем, превышает ли длина ленты сообщений видимую высоту экрана.
+                // Если сообщений мало (они полностью влезают в окно), автоскролл делать НЕ нужно!
+                // Это заблокирует ложное появление скроллбара в пустых диалогах.
+                if (ChatScrollViewer.Extent.Height <= ChatScrollViewer.Viewport.Height)
+                {
+                    return;
+                }
+
+                // 2. Находим наш ItemsControl, внутри которого лежат сообщения
                 var itemsControl = ChatScrollViewer.Content as ItemsControl;
                 if (itemsControl == null)
                 {
-                    // Подстраховка: если ItemsControl обернут в StackPanel (как в вашей текущей разметке)
                     var stackPanel = ChatScrollViewer.Content as StackPanel;
                     itemsControl = stackPanel?.Children[0] as ItemsControl;
                 }
@@ -79,9 +87,10 @@ public partial class MainChatView : UserControl
                 var visualChildren = itemsControl.Presenter.Panel?.Children;
                 if (visualChildren == null || visualChildren.Count == 0) return;
 
+                // 3. Берем самое последнее сообщение
                 var lastVisualMessage = visualChildren[visualChildren.Count - 1];
 
-                // Перебрасываем фокус на последнее сообщение
+                // 4. Докручиваем скролл вниз только для длинной переписки
                 lastVisualMessage.BringIntoView();
             }
             catch { }

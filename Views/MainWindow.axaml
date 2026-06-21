@@ -9,7 +9,7 @@
         x:Class="SecureCryptoClient.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Width="400" Height="550"
+        Width="900" Height="700"
         Title="SecureCryptoClient"
         WindowStartupLocation="CenterScreen">
 

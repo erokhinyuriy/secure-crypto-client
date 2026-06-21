@@ -67,11 +67,16 @@
             <!-- Строка 1: Лента сообщений -->
             <ScrollViewer x:Name="ChatScrollViewer" 
                           Grid.Row="1" 
-                          Padding="14,10,14,-20" 
+                          Padding="14,10,14,0" 
                           VerticalScrollBarVisibility="Auto" 
                           HorizontalScrollBarVisibility="Disabled"
                           ClipToBounds="True">
-                <ItemsControl ItemsSource="{Binding Messages}" ClipToBounds="True">
+                
+                <!-- ИСПРАВЛЕНО: Добавили Margin="0,0,0,15" для всего ItemsControl. 
+                     Это создаст чистый, фиксированный зазор в 15 пикселей снизу ПОД сообщениями, 
+                     чтобы последнее письмо никогда не зажималось панелью ввода, 
+                     и при этом скроллбар будет исчезать, когда сообщений мало! -->
+                <ItemsControl ItemsSource="{Binding Messages}" ClipToBounds="True" Margin="0,0,0,0" Padding="0,0,0,20">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:ChatMessage}">
                             <Grid ColumnDefinitions="Auto, *" HorizontalAlignment="Left" Margin="0,5">
@@ -80,7 +85,7 @@
                                         <Border.BorderBrush>
                                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                                                 <GradientStop Color="#8A2BE2" Offset="0.0"/>
-                                                <GradientStop Color="#00FFFF" Offset="1.0"/>
+                                                <GradientStop Color="#1E90FF" Offset="1.0"/>
                                             </LinearGradientBrush>
                                         </Border.BorderBrush>
                                         <Border Background="#1A2C3B" CornerRadius="13">
@@ -93,7 +98,7 @@
                                 </Panel>
                                 <Border Grid.Column="1" CornerRadius="10" Padding="12,7" MaxWidth="380" Background="{Binding BubbleColor}" BorderBrush="{Binding BorderColor}" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Sender}" FontSize="11" FontWeight="Bold" Foreground="#5288C1" Margin="0,0,0,2"/>
+                                        <!--<TextBlock Text="{Binding Sender}" FontSize="11" FontWeight="Bold" Foreground="#5288C1" Margin="0,0,0,2"/>-->
                                         <TextBlock Text="{Binding Text}" FontSize="13" Foreground="White" TextWrapping="Wrap"/>
                                         <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm}}" FontSize="9" Foreground="#7F91A4" HorizontalAlignment="Right" Margin="0,4,0,0"/>
                                     </StackPanel>
@@ -128,7 +133,7 @@
             </Button>
 
             <!-- Строка 2: Нижняя панель ввода текста -->
-            <Border x:Name="InputPanelBorder" 
+<Border x:Name="InputPanelBorder" 
                     Grid.Row="2" 
                     Background="#17212B" 
                     Padding="12,10" 
@@ -137,8 +142,47 @@
                     BorderThickness="0,1,0,0"
                     IsVisible="{Binding IsChatSelected}">
                 <Grid ColumnDefinitions="*, Auto" Background="#17212B">
-                    <TextBox Grid.Column="0" Watermark="Написать сообщение..." Text="{Binding TypedText}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="6" Padding="12,8" MaxHeight="80" TextWrapping="Wrap" FontSize="13"/>
-                    <Button Grid.Column="1" Content="Отправить" Command="{Binding SendMessageAsync}" Background="Transparent" Foreground="#5288C1" FontSize="14" FontWeight="Bold" Margin="12,0,4,0" VerticalAlignment="Center"/>
+                    
+                    <!-- Поле ввода текста (ИСПРАВЛЕНО: Добавлена привязка к клавише Enter) -->
+                    <TextBox Grid.Column="0" 
+                             Watermark="Написать сообщение..." 
+                             Text="{Binding TypedText}" 
+                             Foreground="White" 
+                             Background="#24303F" 
+                             BorderThickness="0" 
+                             CornerRadius="6" 
+                             Padding="12,8" 
+                             MaxHeight="80" 
+                             TextWrapping="Wrap" 
+                             AcceptsReturn="False" 
+                             FontSize="13">
+                        <TextBox.KeyBindings>
+                            <!-- Нажатие Enter на клавиатуре мгновенно вызывает метод SendMessageAsync -->
+                            <KeyBinding Gesture="Enter" Command="{Binding SendMessageAsync}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    
+                    <!-- КНОПКА ОТПРАВИТЬ С БУМАЖНЫМ САМОЛЕТИКОМ (ИСПРАВЛЕНО: Сделана круглой под стиль Telegram) -->
+                    <Button Grid.Column="1" 
+                            Command="{Binding SendMessageAsync}" 
+                            Width="34" Height="34"
+                            CornerRadius="17" 
+                            Background="#5288C1" 
+                            Foreground="White" 
+                            Margin="10,0,2,0" 
+                            Padding="0"
+                            HorizontalContentAlignment="Center" 
+                            VerticalContentAlignment="Center"
+                            VerticalAlignment="Center">
+                        <!-- Символ бумажного самолетика / стрелки Telegram -->
+                        <TextBlock Text="➔" 
+                                   FontSize="15" 
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"
+                                   Margin="2,0,0,1"/>
+                    </Button>
+                    
                 </Grid>
             </Border>
             
