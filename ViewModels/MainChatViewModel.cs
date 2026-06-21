@@ -22,6 +22,15 @@ public class MainChatViewModel : INotifyPropertyChanged
     private string _chatHeader = "Выберите чат для начала общения";
     private bool _isChatSelected = false;
 
+    private bool _isMenuOpen = false;
+
+    // Управляет открытием и закрытием выезжающего меню
+    public bool IsMenuOpen
+    {
+        get => _isMenuOpen;
+        set { _isMenuOpen = value; OnPropertyChanged(); }
+    }
+
     // Коллекции для UI
     public ObservableCollection<ChatSession> Chats { get; set; } = new();
     public ObservableCollection<ChatMessage> Messages { get; set; } = new();
@@ -77,6 +86,10 @@ public class MainChatViewModel : INotifyPropertyChanged
 
     public event Action? LogoutRequested;
     public string MyUsername => _chatService.Username.ToUpper();
+
+    // Возвращает первую букву вашего имени для аватарки профиля в меню
+    public string MyInitials => string.IsNullOrEmpty(MyUsername) ? "?" : MyUsername[..1].ToUpper();
+
 
     public MainChatViewModel(CryptoChatService chatService, LocalSecureStorage localStorage)
     {
@@ -199,6 +212,17 @@ public class MainChatViewModel : INotifyPropertyChanged
 
         IsScrollButtonVisible = false;
     }
+
+    // Метод-переключатель для кнопки-бургера
+    public void ToggleMenu()
+    {
+        IsMenuOpen = !IsMenuOpen;
+    }
+
+    // Заглушки для новых кнопок меню
+    public void OpenMyProfile() => _chatService.ShowNotification("Профиль", "Раздел 'Мой профиль' находится в разработке.");
+    public void OpenSettings() => _chatService.ShowNotification("Настройки", "Раздел 'Настройки' находится в разработке.");
+    public void CreateGroupChat() => _chatService.ShowNotification("Группа", "Создание групповых чатов будет доступно в следующем обновлении.");
 
     // ЛОГИКА ПУНКТА 2: ВЫХОД ИЗ УЧЕТНОЙ ЗАПИСИ
     public void Logout()

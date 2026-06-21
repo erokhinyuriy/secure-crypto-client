@@ -14,62 +14,114 @@
         <!-- ================= СЛЕВА: ПАНЕЛЬ ЧАТОВ ================= -->
        <!-- Задали жесткий лимит: теперь сплиттер физически упрется в барьер на ширине 320 пикселей и не пойдет дальше вправо! -->
 <Border Grid.Column="0" Background="#17212B" BorderBrush="#101921" BorderThickness="0,0,1,0">
-
-            <Grid RowDefinitions="Auto, Auto, *">
+            
+            <!-- Используем SplitView для реализации выезжающего бокового меню Telegram -->
+            <SplitView IsPaneOpen="{Binding IsMenuOpen}"
+                       DisplayMode="Overlay"
+                       OpenPaneLength="240"
+                       Background="Transparent">
                 
-                <!-- Панель Профиля -->
-                <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="14,12,14,0">
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="#2B5278" CornerRadius="12" Width="24" Height="24" Margin="0,0,8,0">
-                            <TextBlock Text="👤" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="{Binding MyUsername}" Foreground="#5288C1" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <Button Grid.Column="1" Content="Выйти" Command="{Binding Logout}" Background="Transparent" Foreground="#E55757" FontSize="12" FontWeight="SemiBold" Padding="5,2" VerticalAlignment="Center"/>
+                <!-- 1. ВНУТРЕННОСТЬ ВЫЕЗЖАЮЩЕГО МЕНЮ (Выдвигается слева) -->
+               <SplitView.Pane>
+                    <!-- ИСПРАВЛЕНО: Заменили StackPanel на DockPanel, чтобы жестко зафиксировать кнопку Выхода снизу -->
+                    <Border Background="#17212B" BorderBrush="#101921" BorderThickness="0,0,1,0" Padding="15,20">
+                        <DockPanel LastChildFill="True">
+                            
+                            <!-- НИЖНЯЯ КНОПКА: Выйти из аккаунта (ИСПРАВЛЕНО: Намертво прижата к НИЗУ панели) -->
+                            <Button DockPanel.Dock="Bottom" 
+                                    Content="🚪   Выйти из аккаунта" 
+                                    Command="{Binding Logout}" 
+                                    Background="Transparent" 
+                                    Foreground="#E55757" 
+                                    HorizontalAlignment="Stretch" 
+                                    Padding="10,8" 
+                                    CornerRadius="6" 
+                                    FontSize="13" 
+                                    Margin="0,20,0,0"/>
+                            
+                            <!-- СТЕНДАРТНЫЙ СТЕК: Для всех остальных верхних элементов меню -->
+                            <StackPanel Spacing="0">
+                                
+                                <!-- Кнопка Назад (Стрелочка для закрытия меню) -->
+                                <Button Command="{Binding ToggleMenu}" Background="Transparent" Foreground="#7F91A4" Content="← Назад" FontSize="13" Margin="0,0,0,15"/>
+                                
+                                <!-- БЛОК ПРОФИЛЯ -->
+                                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,15">
+                                    <!-- Круглая фото-заглушка (ИСПРАВЛЕНО: Выводим строго MyInitials, одну букву!) -->
+                                    <Border Grid.Column="0" Background="#2B5278" CornerRadius="20" Width="40" Height="40" Margin="0,0,12,0">
+                                        <TextBlock Text="{Binding MyInitials}" Foreground="White" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding MyUsername}" FontWeight="SemiBold" Foreground="White" FontSize="14"/>
+                                        <TextBlock Text="Защищенная сессия X3DH" FontSize="11" Foreground="#7F91A4"/>
+                                    </StackPanel>
+                                </Grid>
+                                
+                                <!-- Сепаратор 1 -->
+                                <Border Height="1" Background="#24303F" Margin="0,5,0,10"/>
+                                
+                                <!-- Кнопки Навигации меню (ИСПРАВЛЕНО: Текст покрашен в синий цвет #5288C1) -->
+                                <Button Content="👤   Мой профиль" Command="{Binding OpenMyProfile}" Background="Transparent" Foreground="#5288C1" HorizontalAlignment="Stretch" Padding="10,8" CornerRadius="6" FontSize="13"/>
+                                <Button Content="⚙️   Настройки" Command="{Binding OpenSettings}" Background="Transparent" Foreground="#5288C1" HorizontalAlignment="Stretch" Padding="10,8" CornerRadius="6" FontSize="13" Margin="0,4,0,0"/>
+                                
+                                <!-- Сепаратор 2 -->
+                                <Border Height="1" Background="#24303F" Margin="0,15,0,10"/>
+                                
+                                <!-- Кнопка создания группы -->
+                                <Button Content="👥   Создать групповой чат" Command="{Binding CreateGroupChat}" Background="Transparent" Foreground="#5288C1" HorizontalAlignment="Stretch" Padding="10,8" CornerRadius="6" FontSize="13"/>
+                                
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </SplitView.Pane>
+
+                <!-- 2. ОСНОВНОЙ КОНТЕНТ ЛЕВОЙ ПАНЕЛИ (Список чатов, который виден всегда) -->
+                <Grid RowDefinitions="Auto, Auto, *">
+                    
+                    <!-- Верхняя панель: Кнопка БУРГЕР и Имя (ИСПРАВЛЕНО) -->
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Margin="14,12,14,0">
+                        <!-- Кнопка-Бургер '☰' открывает меню по клику -->
+                        <Button Grid.Column="0" 
+                                Content="☰" 
+                                Command="{Binding ToggleMenu}" 
+                                Background="Transparent" 
+                                Foreground="#7F91A4" 
+                                FontSize="18" 
+                                Padding="5,2" 
+                                Margin="0,0,10,0"
+                                VerticalAlignment="Center"
+                                Cursor="Hand"/>
+                        <TextBlock Grid.Column="1" Text="{Binding MyUsername}" Foreground="#5288C1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                    </Grid>
+                    
+                    <!-- Поиск / Добавление друга (Строка 1) -->
+                    <Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="14,12">
+                        <TextBox Grid.Column="0" Watermark="Введите username..." Text="{Binding NewFriendUsername}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="6,0,0,6" Height="34" VerticalContentAlignment="Center" Padding="10,0" FontSize="13"/>
+                        <Button Grid.Column="1" Content="+" Command="{Binding AddNewChatByUsernameAsync}" Background="#5288C1" Foreground="White" Width="34" Height="34" CornerRadius="0,6,6,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="16" FontWeight="Bold"/>
+                    </Grid>
+
+                    <!-- Список диалогов (Строка 2) -->
+                    <ListBox Grid.Row="2" ItemsSource="{Binding Chats}" SelectedItem="{Binding SelectedChat}" Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="models:ChatSession">
+                                <Grid ColumnDefinitions="Auto, *, Auto" HorizontalAlignment="Stretch" Margin="10,4,10,4">
+                                    <Border Grid.Column="0" Background="#2B5278" CornerRadius="20" Width="38" Height="38" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding PartnerName}" FontWeight="Bold" Foreground="White" FontSize="13" HorizontalAlignment="Left"/>
+                                        <TextBlock Text="{Binding LastMessage}" Foreground="#7F91A4" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" HorizontalAlignment="Left"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="2" Background="#5288C1" CornerRadius="10" MinHeight="18" MinWidth="18" Padding="5,2" VerticalAlignment="Center" HorizontalAlignment="Right" IsVisible="{Binding HasUnread}">
+                                        <TextBlock Text="{Binding UnreadCount}" FontSize="10" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
                 
-                <!-- Поиск / Добавление -->
-                <Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="14,12">
-                    <TextBox Grid.Column="0" Watermark="Введите username..." Text="{Binding NewFriendUsername}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="6,0,0,6" Height="34" VerticalContentAlignment="Center" Padding="10,0" FontSize="13"/>
-                    <Button Grid.Column="1" Content="+" Command="{Binding AddNewChatByUsernameAsync}" Background="#5288C1" Foreground="White" Width="34" Height="34" CornerRadius="0,6,6,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="16" FontWeight="Bold"/>
-                </Grid>
-
-                <!-- Список диалогов -->
-               <ListBox Grid.Row="2" 
-                         ItemsSource="{Binding Chats}" 
-                         SelectedItem="{Binding SelectedChat}" 
-                         Background="Transparent" 
-                         BorderThickness="0"
-                         HorizontalAlignment="Stretch"> <!-- Растягиваем ListBox по ширине панели -->
-                    <ListBox.ItemTemplate>
-                        <DataTemplate DataType="models:ChatSession">
-                            <!-- ИСПРАВЛЕНО: Убрали жесткую ширину Width="230", добавили HorizontalAlignment="Left" 
-                                 и Margin для красивого отступа от края экрана -->
-                            <Grid ColumnDefinitions="Auto, *, Auto" 
-                                  HorizontalAlignment="Stretch" 
-                                  Margin="10,4,10,4">
-                                
-                                <!-- Круглая заглушка аватарки (Колонка 0) -->
-                                <Border Grid.Column="0" Background="#2B5278" CornerRadius="20" Width="38" Height="38" Margin="0,0,10,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                
-                                <!-- Текст чата (Колонка 1: прижат к левому краю аватарки) -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <TextBlock Text="{Binding PartnerName}" FontWeight="Bold" Foreground="White" FontSize="13" HorizontalAlignment="Left"/>
-                                    <TextBlock Text="{Binding LastMessage}" Foreground="#7F91A4" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" HorizontalAlignment="Left"/>
-                                </StackPanel>
-                                
-                                <!-- Счетчик непрочитанных (Колонка 2: улетает в самый правый край карточки) -->
-                                <Border Grid.Column="2" Background="#5288C1" CornerRadius="10" MinHeight="18" MinWidth="18" Padding="5,2" VerticalAlignment="Center" HorizontalAlignment="Right" IsVisible="{Binding HasUnread}">
-                                    <TextBlock Text="{Binding UnreadCount}" FontSize="10" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Grid>
+            </SplitView>
         </Border>
 
         <!-- ================= ДИНАМИЧЕСКИЙ РАЗДЕЛИТЕЛЬ ОКРАИН ================= -->
