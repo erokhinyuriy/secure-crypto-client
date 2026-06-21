@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using System;
@@ -18,6 +17,11 @@ public partial class MainChatView : UserControl
 
         // ЖЕЛЕЗОБЕТОННЫЙ ФИКС КЛИКА: Напрямую подписываем круглую кнопку на метод скролла вниз!
         ScrollDownBtn.Click += ScrollDownBtn_Click;
+
+        // Подписываемся на клики физических кнопок напрямую на уровне ядра графики.
+        // Это откроет шторку меню с первого клика без лагов фокуса!
+        BurgerBtn.Click += (s, e) => MenuSplitView.IsPaneOpen = true;
+        CloseMenuBtn.Click += (s, e) => MenuSplitView.IsPaneOpen = false;
     }
 
     private void ScrollDownBtn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

@@ -16,7 +16,7 @@
 <Border Grid.Column="0" Background="#17212B" BorderBrush="#101921" BorderThickness="0,0,1,0">
             
             <!-- Используем SplitView для реализации выезжающего бокового меню Telegram -->
-            <SplitView IsPaneOpen="{Binding IsMenuOpen}"
+            <SplitView x:Name="MenuSplitView"
                        DisplayMode="Overlay"
                        OpenPaneLength="240"
                        Background="Transparent">
@@ -43,7 +43,7 @@
                             <StackPanel Spacing="0">
                                 
                                 <!-- Кнопка Назад (Стрелочка для закрытия меню) -->
-                                <Button Command="{Binding ToggleMenu}" Background="Transparent" Foreground="#7F91A4" Content="← Назад" FontSize="13" Margin="0,0,0,15"/>
+                                <Button Name="CloseMenuBtn" Background="Transparent" Foreground="#7F91A4" Content="← Назад" FontSize="13" Margin="0,0,0,15"/>
                                 
                                 <!-- БЛОК ПРОФИЛЯ -->
                                 <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,15">
@@ -81,16 +81,16 @@
                     <!-- Верхняя панель: Кнопка БУРГЕР и Имя (ИСПРАВЛЕНО) -->
                     <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Margin="14,12,14,0">
                         <!-- Кнопка-Бургер '☰' открывает меню по клику -->
-                        <Button Grid.Column="0" 
-                                Content="☰" 
-                                Command="{Binding ToggleMenu}" 
-                                Background="Transparent" 
-                                Foreground="#7F91A4" 
-                                FontSize="18" 
-                                Padding="5,2" 
-                                Margin="0,0,10,0"
-                                VerticalAlignment="Center"
-                                Cursor="Hand"/>
+                    <Button Grid.Column="0" 
+                            Name="BurgerBtn"
+                            Content="☰" 
+                            Background="Transparent" 
+                            Foreground="#7F91A4" 
+                            FontSize="18" 
+                            Padding="5,2" 
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Center"
+                            Cursor="Hand"/>
                         <TextBlock Grid.Column="1" Text="{Binding MyUsername}" Foreground="#5288C1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
                     </Grid>
                     
