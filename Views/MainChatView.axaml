@@ -9,10 +9,12 @@
              x:DataType="vm:MainChatViewModel"
              Background="#182533">
     
-<Grid ColumnDefinitions="260, *">
+<Grid ColumnDefinitions="260, 1, *">
         
         <!-- ================= СЛЕВА: ПАНЕЛЬ ЧАТОВ ================= -->
-        <Border Grid.Column="0" Background="#17212B" BorderBrush="#101921" BorderThickness="0,0,1,0">
+       <!-- Задали жесткий лимит: теперь сплиттер физически упрется в барьер на ширине 320 пикселей и не пойдет дальше вправо! -->
+<Border Grid.Column="0" Background="#17212B" BorderBrush="#101921" BorderThickness="0,0,1,0">
+
             <Grid RowDefinitions="Auto, Auto, *">
                 
                 <!-- Панель Профиля -->
@@ -33,20 +35,36 @@
                 </Grid>
 
                 <!-- Список диалогов -->
-                <ListBox Grid.Row="2" ItemsSource="{Binding Chats}" SelectedItem="{Binding SelectedChat}" Background="Transparent" BorderThickness="0">
+               <ListBox Grid.Row="2" 
+                         ItemsSource="{Binding Chats}" 
+                         SelectedItem="{Binding SelectedChat}" 
+                         Background="Transparent" 
+                         BorderThickness="0"
+                         HorizontalAlignment="Stretch"> <!-- Растягиваем ListBox по ширине панели -->
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="models:ChatSession">
-                            <Grid ColumnDefinitions="Auto, *, Auto" Margin="4,2" Width="230">
-                                <Border Grid.Column="0" Background="#2B5278" CornerRadius="20" Width="38" Height="38" Margin="0,0,10,0">
+                            <!-- ИСПРАВЛЕНО: Убрали жесткую ширину Width="230", добавили HorizontalAlignment="Left" 
+                                 и Margin для красивого отступа от края экрана -->
+                            <Grid ColumnDefinitions="Auto, *, Auto" 
+                                  HorizontalAlignment="Stretch" 
+                                  Margin="10,4,10,4">
+                                
+                                <!-- Круглая заглушка аватарки (Колонка 0) -->
+                                <Border Grid.Column="0" Background="#2B5278" CornerRadius="20" Width="38" Height="38" Margin="0,0,10,0" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding PartnerName}" FontWeight="Bold" Foreground="White" FontSize="13"/>
-                                    <TextBlock Text="{Binding LastMessage}" Foreground="#7F91A4" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                                
+                                <!-- Текст чата (Колонка 1: прижат к левому краю аватарки) -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                    <TextBlock Text="{Binding PartnerName}" FontWeight="Bold" Foreground="White" FontSize="13" HorizontalAlignment="Left"/>
+                                    <TextBlock Text="{Binding LastMessage}" Foreground="#7F91A4" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" HorizontalAlignment="Left"/>
                                 </StackPanel>
+                                
+                                <!-- Счетчик непрочитанных (Колонка 2: улетает в самый правый край карточки) -->
                                 <Border Grid.Column="2" Background="#5288C1" CornerRadius="10" MinHeight="18" MinWidth="18" Padding="5,2" VerticalAlignment="Center" HorizontalAlignment="Right" IsVisible="{Binding HasUnread}">
                                     <TextBlock Text="{Binding UnreadCount}" FontSize="10" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
+                                
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -54,10 +72,17 @@
             </Grid>
         </Border>
 
+        <!-- ================= ДИНАМИЧЕСКИЙ РАЗДЕЛИТЕЛЬ ОКРАИН ================= -->
+        <GridSplitter Grid.Column="1" 
+                      Width="1" 
+                      Background="#101921" 
+                      ResizeDirection="Columns"
+                      ShowsPreview="False"/>
+
         <!-- ================= СПРАВА: ОКНО ПЕРЕПИСКИ ================= -->
         <!-- ИСПРАВЛЕНО: Заменили Grid на DockPanel со свойством LastChildFill. 
              Теперь ScrollViewer гарантированно зажат между заголовком и вводом! -->
-        <Grid Grid.Column="1" RowDefinitions="Auto, *, Auto" Background="#0E1621">
+        <Grid Grid.Column="2" RowDefinitions="Auto, *, Auto" Background="#0E1621">
             
             <!-- Строка 0: Верхний заголовок текущего чата -->
             <Border Grid.Row="0" Background="#17212B" Padding="20,12" BorderBrush="#101921" BorderThickness="0,0,0,1">
@@ -72,17 +97,12 @@
                           HorizontalScrollBarVisibility="Disabled"
                           ClipToBounds="True">
                 
-                <!-- ИСПРАВЛЕНО: Добавили Margin="0,0,0,15" для всего ItemsControl. 
-                     Это создаст чистый, фиксированный зазор в 15 пикселей снизу ПОД сообщениями, 
-                     чтобы последнее письмо никогда не зажималось панелью ввода, 
-                     и при этом скроллбар будет исчезать, когда сообщений мало! -->
                 <ItemsControl ItemsSource="{Binding Messages}" ClipToBounds="True" Margin="0,0,0,0" Padding="0,0,0,20">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:ChatMessage}">
                             <Grid>
                                 
-                                <!-- ================= ВАРИАНТ А: ПЛАШКА С ДАТОЙ (По центру) ================= -->
-                                <!-- Видна только если IsDateSeparator = True -->
+                                <!-- ВАРИАНТ А: ПЛАШКА С ДАТОЙ -->
                                 <Border HorizontalAlignment="Center" 
                                         Background="#1C2833" 
                                         CornerRadius="10" 
@@ -97,20 +117,18 @@
                                                VerticalAlignment="Center"/>
                                 </Border>
 
-                                <!-- ================= ВАРИАНТ Б: СТАНДАРТНОЕ СООБЩЕНИЕ (Слева) ================= -->
-                                <!-- Видно только если IsDateSeparator = False -->
+                                <!-- ВАРИАНТ Б: СТАНДАРТНОЕ СООБЩЕНИЕ -->
                                 <Grid ColumnDefinitions="Auto, *" 
                                       HorizontalAlignment="Left" 
                                       Margin="0,5"
                                       IsVisible="{Binding !IsDateSeparator}">
                                     
-                                    <!-- Аватарка отправителя сообщения -->
                                     <Panel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
                                         <Border Width="30" Height="30" CornerRadius="15" BorderThickness="2" IsVisible="{Binding IsMe}">
                                             <Border.BorderBrush>
                                                 <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                                                     <GradientStop Color="#8A2BE2" Offset="0.0"/>
-                                                    <GradientStop Color="#00FFFF" Offset="1.0"/>
+                                                    <GradientStop Color="#1E90FF" Offset="1.0"/>
                                                 </LinearGradientBrush>
                                             </Border.BorderBrush>
                                             <Border Background="#1A2C3B" CornerRadius="13">
@@ -122,16 +140,14 @@
                                         </Border>
                                     </Panel>
                                     
-                                    <!-- Облачко ("Бабл") сообщения -->
                                     <Border Grid.Column="1" CornerRadius="10" Padding="12,7" MaxWidth="380" Background="{Binding BubbleColor}" BorderBrush="{Binding BorderColor}" BorderThickness="1">
                                         <StackPanel>
-                                            <TextBlock Text="{Binding Sender}" FontSize="11" FontWeight="Bold" Foreground="#5288C1" Margin="0,0,0,2"/>
                                             <TextBlock Text="{Binding Text}" FontSize="13" Foreground="White" TextWrapping="Wrap"/>
                                             <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm}}" FontSize="9" Foreground="#7F91A4" HorizontalAlignment="Right" Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </Border>
                                     
-                                </Grid> <!-- Конец стандартного сообщения -->
+                                </Grid>
                                 
                             </Grid>
                         </DataTemplate>
