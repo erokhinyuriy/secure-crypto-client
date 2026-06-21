@@ -28,7 +28,7 @@
                 
                 <!-- Поиск / Добавление -->
                 <Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="14,12">
-                    <TextBox Grid.Column="0" Watermark="Добавить @username..." Text="{Binding NewFriendUsername}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="6,0,0,6" Height="34" VerticalContentAlignment="Center" Padding="10,0" FontSize="13"/>
+                    <TextBox Grid.Column="0" Watermark="Введите username..." Text="{Binding NewFriendUsername}" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="6,0,0,6" Height="34" VerticalContentAlignment="Center" Padding="10,0" FontSize="13"/>
                     <Button Grid.Column="1" Content="+" Command="{Binding AddNewChatByUsernameAsync}" Background="#5288C1" Foreground="White" Width="34" Height="34" CornerRadius="0,6,6,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="16" FontWeight="Bold"/>
                 </Grid>
 

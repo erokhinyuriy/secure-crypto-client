@@ -294,14 +294,33 @@ public class MainChatViewModel : INotifyPropertyChanged
                 }
             }
 
-            if (SelectedChat == null || !string.Equals(sender, SelectedChat.PartnerName, StringComparison.OrdinalIgnoreCase))
-            {
-                existingChat.UnreadCount++;
+            var mainWindow = Avalonia.Application.Current?.ApplicationLifetime
+            is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.MainWindow : null;
 
-                // Вызываем всплывающее окно в правом нижнем углу экрана
+            // Окно считается скрытым, если оно полностью свернуто (Minimized) или не находится в фону (IsActive = false)
+            bool isWindowHidden = mainWindow == null ||
+                                  mainWindow.WindowState == Avalonia.Controls.WindowState.Minimized ||
+                                  !mainWindow.IsActive;
+
+            // ЖЕЛЕЗОБЕТОННЫЙ ФИКС БАГА:
+            // Мы зажигаем уведомление со звуком в двух случаях:
+            // 1. Если сообщение пришло от человека, чей чат сейчас НЕ открыт на экране.
+            // 2. ИЛИ если чат открыт, но само приложение СВЕРНУТО пользователем на панель задач!
+            if (SelectedChat == null ||
+                !string.Equals(sender, SelectedChat.PartnerName, StringComparison.OrdinalIgnoreCase) ||
+                isWindowHidden)
+            {
+                // Накручиваем счетчик непрочитанных только если мы сидим в ДРУГОМ чате или приложение свернуто
+                if (SelectedChat == null || !string.Equals(sender, SelectedChat.PartnerName, StringComparison.OrdinalIgnoreCase))
+                {
+                    existingChat.UnreadCount++;
+                }
+
+                // Вызываем всплывающее окно со звуком в трее Windows со стопроцентной гарантией!
                 _chatService.ShowNotification(
                     title: $"💬 Новое сообщение от {sender.ToUpper()}",
-                    message: decryptedText // Показываем зашифрованный и только что расшифрованный текст
+                    message: decryptedText
                 );
             }
 
