@@ -108,6 +108,24 @@ public class MainChatViewModel : INotifyPropertyChanged
         set { _newGroupName = value; OnPropertyChanged(); }
     }
 
+    private bool _isGroupChat = false;
+    private string _groupParticipantsCountText = "";
+    public ObservableCollection<string> CurrentGroupMembers { get; set; } = new();
+
+    // Флаг: открыта ли сейчас группа (True) или обычный диалог тет-а-тет (False)
+    public bool IsGroupChat
+    {
+        get => _isGroupChat;
+        set { _isGroupChat = value; OnPropertyChanged(); }
+    }
+
+    // Текст количества участников в шапке (например, "3 участника")
+    public string GroupParticipantsCountText
+    {
+        get => _groupParticipantsCountText;
+        set { _groupParticipantsCountText = value; OnPropertyChanged(); }
+    }
+
 
     public MainChatViewModel(CryptoChatService chatService, LocalSecureStorage localStorage)
     {
@@ -176,6 +194,30 @@ public class MainChatViewModel : INotifyPropertyChanged
 
         ChatHeader = $"Согласование сквозного шифрования с {partner}...";
         Messages.Clear();
+
+        IsGroupChat = partner.StartsWith("Группа", StringComparison.OrdinalIgnoreCase) || partner.StartsWith("@");
+
+        if (IsGroupChat)
+        {
+            ChatHeader = partner; // Название группы (например, "Группа Разработчики")
+
+            // Временные тестовые данные для проверки всплывающего Tooltip списка:
+            CurrentGroupMembers.Add(_chatService.Username); // Вы сами
+            CurrentGroupMembers.Add("alice");
+            CurrentGroupMembers.Add("bob");
+            CurrentGroupMembers.Add("charlie");
+            CurrentGroupMembers.Add("tom");
+
+            // Формируем текст количества участников
+            GroupParticipantsCountText = $"{CurrentGroupMembers.Count} участников";
+        }
+        else
+        {
+            // Обычный диалог тет-а-тет (тот код, который у вас уже был)
+            ChatHeader = $"Согласование сквозного шифрования с {partner}...";
+            await _chatService.InitializeE2EEChannelWithAsync(partner, _localStorage);
+            ChatHeader = $"🔒 {partner.ToUpper()} (Сквозное шифрование)";
+        }
 
         // Гарантируем, что секретный ключ в памяти вычислен
         await _chatService.InitializeE2EEChannelWithAsync(partner, _localStorage);
@@ -276,11 +318,38 @@ public class MainChatViewModel : INotifyPropertyChanged
             return;
         }
 
-        // Закрываем окно создания
+        // Закрываем модальное окно создания группы
         IsCreateGroupWindowVisible = false;
 
-        // В следующих шагах мы допишем сюда генерацию Sender Key группы и отправку на сервер.
-        _chatService.ShowNotification("Успех", $"Группа '{NewGroupName}' успешно инициирована!");
+        // СИМУЛЯЦИЯ СОЗДАНИЯ ГРУППЫ ДЛЯ ПРОВЕРКИ ИНТЕРФЕЙСА:
+        // Мы принудительно закидываем в имя префикс "Группа ", чтобы сработал наш хук в шапке чата
+        string simulatedGroupName = NewGroupName.StartsWith("Группа", StringComparison.OrdinalIgnoreCase)
+            ? NewGroupName
+            : $"Группа {NewGroupName}";
+
+        // Проверяем, нет ли уже такого чата в левой панели
+        var existingGroup = Chats.FirstOrDefault(c => string.Equals(c.PartnerName, simulatedGroupName, StringComparison.OrdinalIgnoreCase));
+
+        if (existingGroup == null)
+        {
+            // Создаем новую сессию чата для левой панели Avalonia UI
+            var newGroupSession = new ChatSession
+            {
+                PartnerName = simulatedGroupName,
+                LastMessage = "Группа успешно создана"
+            };
+
+            // Вставляем группу в самый верх списка диалогов
+            Chats.Insert(0, newGroupSession);
+
+            // Принудительно уведомляем графический интерфейс, что список чатов обновился
+            OnPropertyChanged(nameof(Chats));
+
+            // Автоматически открываем этот только что созданный групповой чат на экране!
+            SelectedChat = newGroupSession;
+        }
+
+        _chatService.ShowNotification("Успех", $"Группа '{simulatedGroupName}' успешно инициирована!");
     }
 
     // ЛОГИКА ПУНКТА 2: ВЫХОД ИЗ УЧЕТНОЙ ЗАПИСИ

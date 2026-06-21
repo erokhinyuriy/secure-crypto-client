@@ -137,8 +137,57 @@
         <Grid Grid.Column="2" RowDefinitions="Auto, *, Auto" Background="#0E1621">
             
             <!-- Строка 0: Верхний заголовок текущего чата -->
-            <Border Grid.Row="0" Background="#17212B" Padding="20,12" BorderBrush="#101921" BorderThickness="0,0,0,1">
-                <TextBlock Text="{Binding ChatHeader}" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+ <Border Grid.Row="0" Background="#17212B" Padding="20,8" BorderBrush="#101921" BorderThickness="0,0,0,1">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    
+                    <!-- Название чата / группы -->
+                    <TextBlock Text="{Binding ChatHeader}" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    
+                    <!-- ПОДЗАГОЛОВОК А: Если это обычный диалог (IsGroupChat = False) -> Просто пустой или обычный статус -->
+                    <Border IsVisible="{Binding !IsGroupChat}" Height="0"/>
+
+                    <!-- ПОДЗАГОЛОВОК Б: Если это ГРУППА (IsGroupChat = True) -> Показываем количество участников в виде кликабельной ссылки -->
+                    <Button IsVisible="{Binding IsGroupChat}"
+                            Background="Transparent" 
+                            Padding="0" Margin="0,2,0,0"
+                            HorizontalAlignment="Center"
+                            Cursor="Hand">
+                        
+                        <!-- Текст счетчика -->
+                        <TextBlock Text="{Binding GroupParticipantsCountText}" Foreground="#7F91A4" FontSize="11" HorizontalAlignment="Center"/>
+                        
+                        <!-- ВСПЛЫВАЮЩЕЕ ОКНО (TOOLTIP/FLYOUT) СО СПИСКОМ УЧАСТНИКОВ ПО КЛИКУ -->
+                        <Button.Flyout>
+                            <Flyout Placement="Bottom">
+                                <!-- Контейнер всплывающего окна (Тёмный, под стиль Telegram) -->
+                                <Border Background="#17212B" BorderBrush="#24303F" BorderThickness="1" CornerRadius="8" Padding="12" Width="180" MaxHeight="220">
+                                    <Grid RowDefinitions="Auto, *">
+                                        
+                                        <!-- Заголовок всплывашки -->
+                                        <TextBlock Grid.Row="0" Text="Участники:" Foreground="#7F91A4" FontSize="11" FontWeight="Bold" Margin="0,0,0,8"/>
+                                        
+                                        <!-- Скроллбар списка (ВКЛЮЧИТСЯ АВТОМАТИЧЕСКИ, ЕСЛИ ЛЮДЕЙ МНОГО) -->
+                                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding CurrentGroupMembers}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type system:String}">
+                                                        <!-- Строка участника: Иконка + Имя -->
+                                                        <StackPanel Orientation="Horizontal" Margin="0,3">
+                                                            <TextBlock Text="•" Foreground="#5288C1" FontWeight="Bold" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding}" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        
+                                    </Grid>
+                                </Border>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    
+                </StackPanel>
             </Border>
 
             <!-- Строка 1: Лента сообщений -->
