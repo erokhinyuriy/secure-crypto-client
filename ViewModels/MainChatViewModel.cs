@@ -152,11 +152,25 @@ public class MainChatViewModel : INotifyPropertyChanged
         ChatHeader = $"🔒 {partner.ToUpper()} (Сквозное шифрование)";
 
         // Читаем локальный архив сообщений
-        var history = _localStorage.GetChatHistory(partner);
-        foreach (var msg in history.OrderBy(m => m.Timestamp))
+        var history = _localStorage.GetChatHistory(partner).OrderBy(m => m.Timestamp).ToList();
+
+        DateTime? lastDate = null;
+
+        foreach (var msg in history)
         {
-            // На лету сверяем автора из базы данных с текущим ником в сессии
             msg.IsMe = string.Equals(msg.Sender, _chatService.Username, StringComparison.OrdinalIgnoreCase);
+
+            // Если это первое сообщение или день сменился — вставляем разделитель даты!
+            if (lastDate == null || lastDate.Value.Date != msg.Timestamp.Date)
+            {
+                Messages.Add(new ChatMessage
+                {
+                    Timestamp = msg.Timestamp,
+                    IsDateSeparator = true // Взводим сервисный флаг
+                });
+                lastDate = msg.Timestamp;
+            }
+
             Messages.Add(msg);
         }
     }
@@ -290,6 +304,16 @@ public class MainChatViewModel : INotifyPropertyChanged
             {
                 if (!Messages.Any(m => string.Equals(m.Text, incomingMsg.Text) && m.Timestamp == incomingMsg.Timestamp))
                 {
+                    var lastVisibleMsg = Messages.LastOrDefault(m => !m.IsDateSeparator);
+                    if (lastVisibleMsg == null || lastVisibleMsg.Timestamp.Date != incomingMsg.Timestamp.Date)
+                    {
+                        Messages.Add(new ChatMessage
+                        {
+                            Timestamp = incomingMsg.Timestamp,
+                            IsDateSeparator = true
+                        });
+                    }
+
                     Messages.Add(incomingMsg);
                 }
             }

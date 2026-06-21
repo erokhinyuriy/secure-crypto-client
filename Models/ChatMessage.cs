@@ -27,4 +27,10 @@ public class ChatMessage
 
     // Первая буква имени для круглой аватарки
     public string Initials => string.IsNullOrEmpty(Sender) ? "?" : Sender[..1].ToUpper();
+
+    // Флаг: является ли элемент системной плашкой с датой
+    public bool IsDateSeparator { get; set; } = false;
+
+    // Красивое отображение даты на русском языке (например, "21 июня 2026")
+    public string FormattedDate => Timestamp.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("ru-RU"));
 }
