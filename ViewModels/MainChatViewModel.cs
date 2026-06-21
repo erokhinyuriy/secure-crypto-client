@@ -90,6 +90,24 @@ public class MainChatViewModel : INotifyPropertyChanged
     // Возвращает первую букву вашего имени для аватарки профиля в меню
     public string MyInitials => string.IsNullOrEmpty(MyUsername) ? "?" : MyUsername[..1].ToUpper();
 
+    private bool _isCreateGroupWindowVisible = false;
+    private string _newGroupName = "";
+    public ObservableCollection<GroupMemberSelection> AvailableFriends { get; set; } = new();
+
+    // Видимость окна создания группы
+    public bool IsCreateGroupWindowVisible
+    {
+        get => _isCreateGroupWindowVisible;
+        set { _isCreateGroupWindowVisible = value; OnPropertyChanged(); }
+    }
+
+    // Название новой группы
+    public string NewGroupName
+    {
+        get => _newGroupName;
+        set { _newGroupName = value; OnPropertyChanged(); }
+    }
+
 
     public MainChatViewModel(CryptoChatService chatService, LocalSecureStorage localStorage)
     {
@@ -222,7 +240,48 @@ public class MainChatViewModel : INotifyPropertyChanged
     // Заглушки для новых кнопок меню
     public void OpenMyProfile() => _chatService.ShowNotification("Профиль", "Раздел 'Мой профиль' находится в разработке.");
     public void OpenSettings() => _chatService.ShowNotification("Настройки", "Раздел 'Настройки' находится в разработке.");
-    public void CreateGroupChat() => _chatService.ShowNotification("Группа", "Создание групповых чатов будет доступно в следующем обновлении.");
+    public void CreateGroupChat()
+    {
+        // Закрываем шторку меню (через вызов события или просто сброс, если нужно)
+        // Наш Code-Behind сам закроет шторку, так как мы подвяжемся на кнопку.
+
+        NewGroupName = string.Empty;
+        AvailableFriends.Clear();
+
+        // Находим всех уникальных собеседников, с кем уже был диалог
+        foreach (var chat in Chats)
+        {
+            AvailableFriends.Add(new GroupMemberSelection { Username = chat.PartnerName, IsSelected = false });
+        }
+
+        // Показываем модальное окно на экране
+        IsCreateGroupWindowVisible = true;
+    }
+
+    public void CancelGroupCreation() => IsCreateGroupWindowVisible = false;
+
+    // ФИНАЛЬНЫЙ КЛИК: Кнопка "Создать" в самом низу окна
+    public async Task ConfirmCreateGroupAsync()
+    {
+        if (string.IsNullOrWhiteSpace(NewGroupName))
+        {
+            _chatService.ShowNotification("Ошибка", "Введите название группы");
+            return;
+        }
+
+        var selectedUsers = AvailableFriends.Where(f => f.IsSelected).Select(f => f.Username).ToList();
+        if (selectedUsers.Count == 0)
+        {
+            _chatService.ShowNotification("Ошибка", "Выберите хотя бы одного участника");
+            return;
+        }
+
+        // Закрываем окно создания
+        IsCreateGroupWindowVisible = false;
+
+        // В следующих шагах мы допишем сюда генерацию Sender Key группы и отправку на сервер.
+        _chatService.ShowNotification("Успех", $"Группа '{NewGroupName}' успешно инициирована!");
+    }
 
     // ЛОГИКА ПУНКТА 2: ВЫХОД ИЗ УЧЕТНОЙ ЗАПИСИ
     public void Logout()

@@ -68,7 +68,7 @@
                                 <Border Height="1" Background="#24303F" Margin="0,15,0,10"/>
                                 
                                 <!-- Кнопка создания группы -->
-                                <Button Content="👥   Создать групповой чат" Command="{Binding CreateGroupChat}" Background="Transparent" Foreground="#5288C1" HorizontalAlignment="Stretch" Padding="10,8" CornerRadius="6" FontSize="13"/>
+                                <Button Name="CreateGroupBtn" Content="👥   Создать групповой чат" Background="Transparent" Foreground="#5288C1" HorizontalAlignment="Stretch" Padding="10,8" CornerRadius="6" FontSize="13"/>
                                 
                             </StackPanel>
                         </DockPanel>
@@ -291,5 +291,72 @@
             </Border>
             
         </Grid> <!-- Конец правой панели -->
+
+        <!-- ================= МОДАЛЬНОЕ ОКНО СОЗДАНИЯ ГРУППЫ ================= -->
+        <!-- Размещено в ColumnSpan="3", чтобы полностью перекрыть и левую, и правую панель -->
+        <Grid Grid.Column="0" Grid.ColumnSpan="3" 
+              Background="#A0000000" 
+              IsVisible="{Binding IsCreateGroupWindowVisible}"
+              VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+            
+            <!-- Сама карточка по центру экрана -->
+            <Border Background="#17212B" 
+                    BorderBrush="#24303F" BorderThickness="1" 
+                    CornerRadius="12" 
+                    Width="340" Height="460"
+                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Padding="20">
+                <Grid RowDefinitions="Auto, Auto, *, Auto">
+                    
+                    <!-- Шапка окна -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,15">
+                        <TextBlock Grid.Column="0" Text="Создание группы" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Content="✕" Command="{Binding CancelGroupCreation}" Background="Transparent" Foreground="#7F91A4" FontSize="16"/>
+                    </Grid>
+                    
+                    <!-- Поле ввода названия группы -->
+                    <TextBox Grid.Row="1" 
+                             Watermark="Название группы" 
+                             Text="{Binding NewGroupName}"
+                             Foreground="White" Background="#24303F"
+                             BorderThickness="0" CornerRadius="6" Padding="10,8" Margin="0,0,0,15"/>
+                    
+                    <!-- Список друзей с прокруткой для выбора участников -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,0,0,15">
+                        <ItemsControl ItemsSource="{Binding AvailableFriends}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="models:GroupMemberSelection">
+                                    <!-- Элемент выбора: Аватарка + Ник + Синяя галочка CheckBox -->
+                                    <Grid ColumnDefinitions="Auto, *, Auto" Margin="0,4">
+                                        <Border Grid.Column="0" Background="#2B5278" CornerRadius="16" Width="32" Height="32" Margin="0,0,10,0">
+                                            <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Grid.Column="1" Text="{Binding Username}" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                                        
+                                        <!-- Синий кастомный CheckBox (Галочка) -->
+                                        <CheckBox Grid.Column="2" 
+                                                  IsChecked="{Binding IsSelected}" 
+                                                  VerticalAlignment="Center"
+                                                  MinWidth="0" Padding="0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    
+                    <!-- Нижняя кнопка "Создать" -->
+                    <Button Grid.Row="3" 
+                            Content="Создать группу" 
+                            Command="{Binding ConfirmCreateGroupAsync}"
+                            Background="#5288C1" Foreground="White"
+                            FontWeight="SemiBold" FontSize="14"
+                            Height="38" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                            CornerRadius="6"/>
+                    
+                </Grid>
+            </Border>
+        </Grid>
+
     </Grid>
 </UserControl>

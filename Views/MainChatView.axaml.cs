@@ -22,6 +22,12 @@ public partial class MainChatView : UserControl
         // Это откроет шторку меню с первого клика без лагов фокуса!
         BurgerBtn.Click += (s, e) => MenuSplitView.IsPaneOpen = true;
         CloseMenuBtn.Click += (s, e) => MenuSplitView.IsPaneOpen = false;
+
+        CreateGroupBtn.Click += (s, e) =>
+        {
+            MenuSplitView.IsPaneOpen = false; // Закрываем шторку
+            if (DataContext is MainChatViewModel vm) vm.CreateGroupChat(); // Открываем модалку
+        };
     }
 
     private void ScrollDownBtn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
