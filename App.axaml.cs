@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Notifications;
 using Avalonia.Markup.Xaml;
 using SecureCryptoClient.ViewModels;
 using SecureCryptoClient.Views;
@@ -23,23 +24,31 @@ namespace SecureCryptoClient
                     DataContext = mainVm,
                 };
 
-                // ДИНАМИЧЕСКИЙ РЕcontrol РАЗМЕРОВ ОКНА:
-                // Слушаем, какой экран сейчас активен. 
+                // ЖЕЛЕЗОБЕТОННЫЙ ХУК УВЕДОМЛЕНИЙ:
+                // Создаем менеджер всплывающих окон и жестко привязываем его к нашему MainWindow.
+                // Параметр Position.BottomRight заставит карточки всплывать в правом нижнем углу экрана!
+                var notificationManager = new WindowNotificationManager(mainWindow)
+                {
+                    Position = NotificationPosition.BottomRight,
+                    MaxItems = 4 // Максимум 4 уведомления одновременно друг над другом, как в Telegram
+                };
+
+                // Передаем ссылку на менеджер в наш синглтон CryptoChatService, 
+                // чтобы сетевой слой мог триггерить всплывашки при получении байт из сокета
+                mainVm.ChatService.SetNotificationManager(notificationManager);
+
+                // Слушаем, какой экран сейчас активен (переключение размеров окна)
                 mainVm.PropertyChanged += (sender, args) =>
                 {
                     if (args.PropertyName == nameof(mainVm.CurrentContent))
                     {
-                        // Если пользователь вошел и перед глазами открывается MainChatViewModel
                         if (mainVm.CurrentContent is MainChatViewModel)
                         {
-                            // Разворачиваем до просторных размеров Telegram Desktop
                             mainWindow.Width = 850;
                             mainWindow.Height = 600;
                         }
-                        // Если пользователь нажал Выйти и вернулся на AuthViewModel
                         else if (mainVm.CurrentContent is AuthViewModel)
                         {
-                            // Сжимаем обратно в аккуратное стартовое окошко
                             mainWindow.Width = 400;
                             mainWindow.Height = 550;
                         }

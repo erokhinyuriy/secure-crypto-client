@@ -6,29 +6,85 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:DataType="vm:AuthViewModel"
              x:Class="SecureCryptoClient.AuthView">
-     <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Width="320" 
-          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+    <!-- Основной центрированный контейнер -->
+       <!-- Главный контейнер, центрирующий карточку входа -->
+   <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Width="360">
         
-        <!-- Строка 0: Заголовок -->
-        <TextBlock Grid.Row="0" Text="CryptoChat Security" FontSize="22" FontWeight="Bold" Foreground="White" Margin="0,0,0,20" HorizontalAlignment="Center"/>
-        
-        <!-- Строка 1: Поле ввода Логина -->
-        <TextBox Grid.Row="1" Watermark="Имя пользователя (Логин / Регистрация)" Text="{Binding Username}" Margin="0,5" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="4"/>
-        
-        <!-- Строка 2: Поле ввода Мастер-пароля -->
-        <TextBox Grid.Row="2" Watermark="Мастер-пароль (шифрование диска)" Text="{Binding MasterPassword}" PasswordChar="●" Margin="0,5" Foreground="White" Background="#24303F" BorderThickness="0" CornerRadius="4"/>
-        
-        <!-- Строка 3: Галочка "Запомнить меня" (ТЕПЕРЬ ОНА НА СВОЕМ МЕСТЕ) -->
-        <CheckBox Grid.Row="3" Content="Запомнить меня на этом устройстве" IsChecked="{Binding RememberMe}" Foreground="#7F91A4" FontSize="12" Margin="0,5"/>
-        
-        <!-- Строка 4: Кнопка Войти -->
-        <Button Grid.Row="4" Content="Войти (Расшифровать локальную БД)" Command="{Binding LoginLocal}" IsEnabled="{Binding IsButtonsEnabled}" Width="320" HorizontalContentAlignment="Center" Background="#5288C1" Foreground="White" CornerRadius="4" Padding="0,10" Margin="0,10,0,5"/>
-        
-        <!-- Строка 5: Кнопка Регистрации -->
-        <Button Grid.Row="5" Content="Создать новый аккаунт (Регистрация)" Command="{Binding RegisterAndConnectAsync}" IsEnabled="{Binding IsButtonsEnabled}" Width="320" HorizontalContentAlignment="Center" Background="#24303F" Foreground="#5288C1" BorderBrush="#5288C1" BorderThickness="1" CornerRadius="4" Padding="0,10" Margin="0,5"/>
-        
-        <!-- Строка 6: Статус-бар сообщений об ошибках -->
-        <TextBlock Grid.Row="6" Text="{Binding StatusMessage}" Foreground="#7F91A4" FontSize="12" Margin="0,15,0,0" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+        <!-- Карточка формы входа с красивым скруглением и матовым фоном -->
+        <Border Background="#17212B" 
+                BorderBrush="#24303F" 
+                BorderThickness="1" 
+                CornerRadius="12" 
+                Padding="25,30">
+            
+            <StackPanel Spacing="15">
+                
+                <!-- Оригинальная иконка Telegram (Круг с вектором, как на кнопке отправки) -->
+                <Border Width="64" Height="64" CornerRadius="32" Background="#5288C1" HorizontalAlignment="Center" Margin="0,0,0,5">
+                    <Path Data="M2,21 L23,12 L2,3 L2,10 L17,12 L2,14 L2,21 Z"
+                          Fill="White" Width="20" Height="20" Stretch="Uniform"
+                          VerticalAlignment="Center" HorizontalAlignment="Center" Margin="4,0,0,1"/>
+                </Border>
+                
+                <!-- Заголовок (РУСИФИЦИРОВАНО) -->
+                <TextBlock Text="Вход в CryptoChat" 
+                           FontSize="22" 
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           Foreground="White"
+                           Margin="0,0,0,10"/>
+                
+                <!-- Поле ввода Логина (РУСИФИЦИРОВАНО) -->
+                <TextBox x:Name="UsernameBox" 
+                         Watermark="Имя пользователя"
+                         Text="{Binding Username}"
+                         Foreground="White" Background="#24303F"
+                         BorderThickness="0" CornerRadius="6" Padding="12,10"/>
+                
+                <!-- Поле ввода Мастер-пароля (РУСИФИЦИРОВАНО) -->
+                <TextBox x:Name="PasswordBox" 
+                         PasswordChar="●"
+                         Watermark="Мастер-пароль"
+                         Text="{Binding MasterPassword}"
+                         Foreground="White" Background="#24303F"
+                         BorderThickness="0" CornerRadius="6" Padding="12,10"/>
+                
+                <!-- Галочка "Запомнить меня" (РУСИФИЦИРОВАНО) -->
+                <CheckBox x:Name="RememberCheckbox" 
+                          Content="Запомнить меня на этом устройстве"
+                          IsChecked="{Binding RememberMe}"
+                          Foreground="#7F91A4" FontSize="13" Margin="2,0,0,10"/>
+                
+                <!-- Главная кнопка Входа (РУСИФИЦИРОВАНО) -->
+                <Button x:Name="LoginButton" 
+                        Command="{Binding LoginLocal}"
+                        IsEnabled="{Binding IsButtonsEnabled}"
+                        Content="Войти"
+                        Width="310" Height="42"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                        Background="#5288C1" Foreground="White"
+                        FontWeight="SemiBold" FontSize="14"
+                        CornerRadius="6"/>
+                
+                <!-- Кнопка Регистрации (РУСИФИЦИРОВАНО) -->
+                <Button x:Name="RegisterLink" 
+                        Command="{Binding RegisterAndConnectAsync}"
+                        IsEnabled="{Binding IsButtonsEnabled}"
+                        Content="Нет учетной записи? Зарегистрироваться"
+                        Width="310" Height="32"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                        Background="Transparent" Foreground="#5288C1"
+                        FontSize="13" CornerRadius="6"/>
+                
+                <!-- Сообщение об ошибке -->
+                <TextBlock x:Name="ErrorMessageText" 
+                           Text="{Binding StatusMessage}"
+                           Foreground="#E55757" FontSize="12"
+                           TextAlignment="Center" HorizontalAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,5,0,0"/>
+                
+            </StackPanel>
+        </Border>
         
     </Grid>
 </UserControl>

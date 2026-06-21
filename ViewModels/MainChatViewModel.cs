@@ -297,6 +297,12 @@ public class MainChatViewModel : INotifyPropertyChanged
             if (SelectedChat == null || !string.Equals(sender, SelectedChat.PartnerName, StringComparison.OrdinalIgnoreCase))
             {
                 existingChat.UnreadCount++;
+
+                // Вызываем всплывающее окно в правом нижнем углу экрана
+                _chatService.ShowNotification(
+                    title: $"💬 Новое сообщение от {sender.ToUpper()}",
+                    message: decryptedText // Показываем зашифрованный и только что расшифрованный текст
+                );
             }
 
             // Сохраняем сообщение в LiteDB на диск

@@ -1,5 +1,10 @@
-﻿using System;
+﻿using Avalonia.Controls.Notifications;
+using Microsoft.Win32;
+using NSec.Cryptography;
+using SecureCryptoClient.Models;
+using System;
 using System.IO;
+using System.Media;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
@@ -8,8 +13,6 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using NSec.Cryptography;
-using SecureCryptoClient.Models;
 
 namespace SecureCryptoClient.Services;
 
@@ -19,6 +22,7 @@ public class CryptoChatService
     private readonly string _serverWsUrl = "ws://localhost:5267/ws";
     private readonly HttpClient _httpClient = new();
     private ClientWebSocket? _webSocket;
+    private WindowNotificationManager? _notificationManager;
 
     private byte[]? _privateIdentityKey; // Ed25519
     public string PublicKeyBase64 { get; set; } = "";
@@ -224,6 +228,85 @@ public class CryptoChatService
             return true;
         }
         return false;
+    }
+
+    public void SetNotificationManager(WindowNotificationManager manager)
+    {
+        _notificationManager = manager;
+    }
+
+    // Метод выводит красивое всплывающее окно в углу экрана ПК
+    public void ShowNotification(string title, string message)
+    {
+        // 1. ВОСПРОИЗВЕДЕНИЕ ЗВУКА УВЕДОМЛЕНИЯ
+        try
+        {
+            // Ищем файл notification.wav в папке запуска приложения
+            string soundPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "notification.wav");
+
+            if (File.Exists(soundPath))
+            {
+                // Используем стандартный системный плеер .NET
+                using (var player = new SoundPlayer(soundPath))
+                {
+                    player.Play(); // Проигрывает звук асинхронно, не тормозя работу сети
+                }
+            }
+        }
+        catch
+        {
+            // Если звуковая карта занята или файл отсутствует — мессенджер продолжит работу без ошибок
+        }
+
+        // 2. ВЫВОД СИСТЕМНОЙ КАРТОЧКИ WINDOWS
+        try
+        {
+            string appId = "SecureCryptoMessenger.App";
+            using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\" + appId))
+            {
+                if (key != null)
+                {
+                    key.SetValue("ShowInActionCenter", 1, RegistryValueKind.DWord);
+                }
+            }
+
+            var safeTitle = title.Replace("\"", "'");
+            var safeMessage = message.Replace("\"", "'");
+
+            // Обратите внимание: в конце XML-шаблона мы принудительно отключили стандартный звук Windows (silent='true'),
+            // чтобы системный писк Windows не накладывался на наш красивый фирменный звук мессенджера!
+            string script = $@"
+                [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] | Out-Null;
+                [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType=WindowsRuntime] | Out-Null;
+        
+                $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02);
+                $toastTextElements = $template.GetElementsByTagName('text');
+                $toastTextElements.Item(0).AppendChild($template.CreateTextNode('{safeTitle}')) | Out-Null;
+                $toastTextElements.Item(1).AppendChild($template.CreateTextNode('{safeMessage}')) | Out-Null;
+        
+                $toastNode = $template.SelectSingleNode('/toast');
+                $audioNode = $template.CreateElement('audio');
+                $audioNode.SetAttribute('silent', 'true');
+                $toastNode.AppendChild($audioNode) | Out-Null;
+        
+                $toast = [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType=WindowsRuntime]::New($template);
+                [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{appId}').Show($toast);
+            ";
+
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell",
+                Arguments = $"-NoProfile -WindowStyle Hidden -Command \"{script}\"",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+
+            System.Diagnostics.Process.Start(startInfo);
+        }
+        catch
+        {
+            // Подстраховка для других ОС
+        }
     }
 
     private async Task SendPacketAsync(string recipient, string type, string cipherPayload)

@@ -10,6 +10,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private readonly CryptoChatService _chatService;
     private LocalSecureStorage _localStorage;
 
+    public CryptoChatService ChatService { get => _chatService;  }
+
     private object _currentContent;
 
     // Свойство, к которому привязан ContentControl в XAML.
