@@ -69,8 +69,15 @@ public class CryptoChatService
         using var ecdhOneTime = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
 
         var pubId = Convert.ToBase64String(ecdhIdentity.PublicKey.ExportSubjectPublicKeyInfo());
-        var pubSigned = Convert.ToBase64String(ecdhSignedPre.PublicKey.ExportSubjectPublicKeyInfo());
+        byte[] pubSignedBytes = ecdhSignedPre.PublicKey.ExportSubjectPublicKeyInfo();
+        var pubSigned = Convert.ToBase64String(pubSignedBytes);
         var pubOneTime = Convert.ToBase64String(ecdhOneTime.PublicKey.ExportSubjectPublicKeyInfo());
+
+        // НОВОЕ: подписываем байты SignedPrekey нашим Ed25519 identity-ключом.
+        // Без этой подписи получатель бандла не может отличить настоящий SignedPrekey
+        // от подменённого сервером (или атакующим, имеющим доступ к серверу).
+        byte[] signedPrekeySignatureBytes = SignatureAlgorithm.Ed25519.Sign(edKey, pubSignedBytes);
+        var signedPrekeySignatureBase64 = Convert.ToBase64String(signedPrekeySignatureBytes);
 
         var dto = new
         {
@@ -78,6 +85,7 @@ public class CryptoChatService
             PublicKeyBase64 = PublicKeyBase64,
             EcdhIdentityKeyBase64 = pubId,
             SignedPrekeyBase64 = pubSigned,
+            SignedPrekeySignatureBase64 = signedPrekeySignatureBase64,
             OneTimePrekeyBase64 = pubOneTime
         };
 
@@ -115,6 +123,16 @@ public class CryptoChatService
                 jsonOptions
             );
             if (bundle == null) return false;
+
+            // НОВОЕ: проверяем подпись SignedPrekey ПЕРЕД тем, как использовать его в DH.
+            // Если сервер (или кто-то на пути к нему) подменил SignedPrekey — подпись не пройдёт,
+            // и мы НЕ должны строить сессию на этом ключе.
+            if (!VerifySignedPrekey(bundle.Ed25519PublicKey, bundle.SignedPrekey, bundle.SignedPrekeySignature))
+            {
+                Console.WriteLine($"[⚠️ КРИПТО] Подпись SignedPrekey пользователя '{friend}' НЕ прошла проверку. Возможна подмена ключа (MITM). Сессия отменена.");
+                ShowNotification("Угроза безопасности", $"Не удалось подтвердить ключи пользователя {friend}. Соединение отменено.");
+                return false;
+            }
 
             // Определяем роли по алфавитному порядку никнеймов для симметрии вычислений
             bool isInitiator = string.Compare(Username, friend) < 0;
@@ -537,12 +555,37 @@ public class CryptoChatService
         throw new Exception($"Криптографический ключ X3DH сессии для пользователя {target} не найден в ОЗУ.");
     }
 
+    // Проверка подписи SignedPrekey Ed25519-ключом identity отправителя бандла.
+    // Зеркальная копия серверной VerifySignedPrekey — проверка обязана выполняться
+    // именно тут, на клиенте-получателе, а не только на сервере при регистрации.
+    private bool VerifySignedPrekey(string identityEd25519PublicKeyBase64, string signedPrekeyBase64, string signatureBase64)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(signatureBase64)) return false; // старый бандл без подписи — не доверяем
+
+            byte[] pubKeyBytes = Convert.FromBase64String(identityEd25519PublicKeyBase64);
+            byte[] prekeyBytes = Convert.FromBase64String(signedPrekeyBase64);
+            byte[] sigBytes = Convert.FromBase64String(signatureBase64);
+
+            var algorithm = SignatureAlgorithm.Ed25519;
+            var publicKey = PublicKey.Import(algorithm, pubKeyBytes, KeyBlobFormat.RawPublicKey);
+
+            return algorithm.Verify(publicKey, prekeyBytes, sigBytes);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private class PrekeyBundleDto 
     {
         public string Username { get; set; } = "";
         public string Ed25519PublicKey { get; set; } = "";
         public string EcdhIdentityKey { get; set; } = "";
         public string SignedPrekey { get; set; } = "";
+        public string SignedPrekeySignature { get; set; } = "";
         public string OneTimePrekey { get; set; } = "";
     }
 }
