@@ -125,6 +125,32 @@ public class LocalSecureStorage
         return allPartners;
     }
 
+    #region Groups
+
+    // Метод сохранения ключа группы
+    public void SaveGroupKey(Guid groupId, string groupName, byte[] key)
+    {
+        var col = _database!.GetCollection<LocalGroupKeyInfo>("group_keys");
+        var idStr = groupId.ToString().ToLower().Trim();
+
+        // Проверяем, нет ли уже такого ключа
+        var existing = col.FindOne(x => x.GroupIdStr == idStr);
+        if (existing == null)
+        {
+            col.Insert(new LocalGroupKeyInfo { GroupIdStr = idStr, GroupName = groupName, AESGroupKey = key });
+        }
+    }
+
+    // Метод чтения ключа группы
+    public byte[]? GetGroupKey(Guid groupId)
+    {
+        var col = _database!.GetCollection<LocalGroupKeyInfo>("group_keys");
+        var idStr = groupId.ToString().ToLower().Trim();
+        return col.FindOne(x => x.GroupIdStr == idStr)?.AESGroupKey;
+    }
+
+    #endregion
+
     // Метод генерирует уникальный 256-битный ключ, привязанный к текущему железу/ОС
     private static byte[] GetMachineFingerprintKey()
     {
@@ -226,6 +252,33 @@ public class LocalSecureStorage
         }
         catch { }
         return null;
+    }
+
+    public void ClearChatHistory(string partnerName)
+    {
+        if (_database is null) 
+            return;
+
+        // Получаем доступ к вашей стандартной коллекции сообщений
+        var col = _database.GetCollection<ChatMessage>("messages");
+
+        var normalizedPartner = partnerName.ToLower().Trim();
+
+        // Удаляем из базы все сообщения, где этот пользователь был либо отправителем, либо получателем
+        col.DeleteMany(m => m.ChatPartner.ToLower() == normalizedPartner || m.Sender.ToLower() == normalizedPartner);
+    }
+
+    public byte[]? GetGroupKeyByName(string groupName)
+    {
+        if (_database is null) return null;
+
+        var col = _database.GetCollection<LocalGroupKeyInfo>("group_keys");
+
+        // ИСПРАВЛЕНО: Безопасно вычищаем префикс "Группа:" прямо внутри хранилища
+        var normalizedName = groupName.Replace("Группа:", "").Replace("Группа", "").ToLower().Trim();
+
+        var keyInfo = col.FindOne(x => x.GroupName.ToLower() == normalizedName);
+        return keyInfo?.AESGroupKey;
     }
 
     // Закрытие базы данных при выходе из приложения (чтобы стереть ключи из ОЗУ)

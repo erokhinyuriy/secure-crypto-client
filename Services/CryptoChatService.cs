@@ -1,8 +1,10 @@
 ﻿using Avalonia.Controls.Notifications;
+using Avalonia.Threading;
 using Microsoft.Win32;
 using NSec.Cryptography;
 using SecureCryptoClient.Models;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Media;
 using System.Net.Http;
@@ -24,6 +26,8 @@ public class CryptoChatService
     private ClientWebSocket? _webSocket;
     private WindowNotificationManager? _notificationManager;
 
+    private LocalSecureStorage? _localStorage;
+
     private byte[]? _privateIdentityKey; // Ed25519
     public string PublicKeyBase64 { get; set; } = "";
     public string Username { get; set; } = "";
@@ -33,9 +37,17 @@ public class CryptoChatService
 
     public CryptoChatService(string username) => Username = username.ToLower().Trim();
 
+    public event Action<GroupKeyPacket>? GroupAdded;
+
     public byte[]? GetChatKey(string friend)
     {
         return _activeChatKeys.TryGetValue(friend.ToLower().Trim(), out var key) ? key : null;
+    }
+
+    // Обновим метод инициализации или добавим сеттер, чтобы связать базу:
+    public void SetStorage(LocalSecureStorage storage)
+    {
+        _localStorage = storage;
     }
 
     public event Action<SignedPacket>? MessageReceived;
@@ -96,7 +108,12 @@ public class CryptoChatService
         try
         {
             // 1. Скачиваем "Крипто-Паспорт" друга с сервера
-            var bundle = await _httpClient.GetFromJsonAsync<PrekeyBundleDto>($"{_serverHttpUrl}/api/crypto/prekey-bundle/{friend}");
+            var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            var bundle = await _httpClient.GetFromJsonAsync<PrekeyBundleDto>(
+                $"{_serverHttpUrl}/api/crypto/prekey-bundle/{friend}",
+                jsonOptions
+            );
             if (bundle == null) return false;
 
             // Определяем роли по алфавитному порядку никнеймов для симметрии вычислений
@@ -161,7 +178,11 @@ public class CryptoChatService
 
     public async Task ConnectAsync()
     {
-        if (_privateIdentityKey == null) throw new InvalidOperationException("Нет ключей подписи пакетов.");
+        if (_privateIdentityKey is null) 
+            throw new InvalidOperationException("Нет ключей подписи пакетов.");
+
+        if (_localStorage is null)
+            throw new InvalidOperationException("Локальное хранилище не подключено.");
 
         // ЖЕЛЕЗОБЕТОННЫЙ ФИКС ДУБЛИРОВАНИЯ ПОТОКОВ:
         // Если сокет уже создан и подключен, мы НЕ запускаем новый Task.Run и не создаем дублирующий поток чтения!
@@ -188,12 +209,107 @@ public class CryptoChatService
                     if (result.MessageType == WebSocketMessageType.Close) break;
 
                     var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    var packet = JsonSerializer.Deserialize<SignedPacket>(json);
+                    var packet = JsonSerializer.Deserialize<SignedPacket>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
 
                     if (packet != null && packet.Type == "MESSAGE")
                     {
                         // Вызываем событие. Его услышит только та ViewModel, которая активна сейчас
                         MessageReceived?.Invoke(packet);
+                    }
+
+                    if (packet.Type == "GROUP_KEY_DISTRIBUTION")
+                    {
+                        try
+                        {
+                            // 1. Десериализуем технический JSON-пакет из Payload
+                            var keyPacket = JsonSerializer.Deserialize<GroupKeyPacket>(packet.PayloadCipherBase64, new JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true
+                            });
+                            if (keyPacket != null)
+                            {
+                                string sender = packet.Sender.ToLower().Trim();
+
+                                // 2. Достаем сессионный ключ X3DH общения с создателем группы
+                                byte[] sessionKey = GetSharedKeyForUser(sender, _localStorage);
+
+                                // 3. Расшифровываем 32-байтный мастер-ключ созданной группы
+                                byte[] packetBytes = Convert.FromBase64String(keyPacket.EncryptedGroupKeyBase64);
+
+                                using var ms = new MemoryStream(packetBytes);
+                                using var reader = new BinaryReader(ms);
+
+                                byte[] nonce = reader.ReadBytes(12);
+                                byte[] tag = reader.ReadBytes(16);
+                                byte[] ciphertext = reader.ReadBytes(packetBytes.Length - 12 - 16);
+
+                                using var aes = new AesGcm(sessionKey, 16);
+                                byte[] decryptedGroupKey = new byte[ciphertext.Length];
+
+                                aes.Decrypt(nonce, ciphertext, tag, decryptedGroupKey);
+
+                                // 4. Тихо сохраняем ключ группы в локальную зашифрованную базу данных LiteDB Боба/Чарли
+                                _localStorage.SaveGroupKey(keyPacket.GroupId, keyPacket.GroupName, decryptedGroupKey);
+
+                                // 5. Перебрасываем уведомление во ViewModel, чтобы чат сам появился в левой панели
+                                // ЖЕЛЕЗОБЕТОННЫЙ ФИКС СИНХРОНИЗАЦИИ (ИСПРАВЛЕНО):
+                                // Вместо капризного события во ViewModel, которое может быть null,
+                                // мы шлем прямое уведомление в операционную систему о том, что Боб добавлен в группу.
+                                ShowNotification("CryptoChat Группы", $"Вы добавлены в секретную группу '{keyPacket.GroupName}'");
+
+                                // Также записываем стартовое сервисное сообщение в локальную базу Боба,
+                                // чтобы при открытии чата Боб сразу видел, кто его добавил!
+                                _localStorage.SaveMessage(new ChatMessage
+                                {
+                                    ChatPartner = $"Группа: {keyPacket.GroupName}",
+                                    Sender = keyPacket.Creator,
+                                    Text = $"Вас добавил пользователь {keyPacket.Creator}",
+                                    Timestamp = DateTime.UtcNow
+                                });
+
+                                // ИСПРАВЛЕНО: Генерируем событие для ViewModel Боба!
+                                GroupAdded?.Invoke(keyPacket);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[КРИПТО-ГРУППА] Ошибка разбора пакета ключей: {ex.Message}");
+                        }
+
+                        continue; // Системный пакет обработан, прерываем итерацию, чтобы не выводить шум в обычный чат
+                    }
+
+                    // ЖЕЛЕЗОБЕТОННЫЙ ХУК ПРИЕМА ГРУППОВЫХ СООБЩЕНИЙ (ДОБАВЛЕНО):
+                    if (packet != null && packet.Type == "GROUP_MESSAGE")
+                    {
+                        try
+                        {
+                            var groupTarget = packet.Recipient.Trim(); // Имя группы, куда пришло письмо
+                            var sender = packet.Sender.ToLower().Trim();
+
+                            // Ищем ключ этой группы в локальной зашифрованной LiteDB Боба
+                            byte[]? groupKey = _localStorage!.GetGroupKeyByName(groupTarget);
+
+                            if (groupKey != null)
+                            {
+                                // Расшифровываем текст сообщения единым ключом группы (Sender Key)!
+                                string decryptedText = DecryptAesGcm(packet.PayloadCipherBase64, groupKey);
+
+                                // Подменяем зашифрованный текст на чистый, чтобы ViewModel вывела его на экран
+                                packet.PayloadCipherBase64 = decryptedText;
+
+                                // Триггерим стандартное событие получения сообщения. 
+                                // ViewModel сама поймет, что это групповой чат, по имени в packet.Recipient!
+                                MessageReceived?.Invoke(packet);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[ГРУППА] Ошибка расшифровки группового сообщения: {ex.Message}");
+                        }
                     }
                 }
                 catch { break; }
@@ -309,14 +425,14 @@ public class CryptoChatService
         }
     }
 
-    private async Task SendPacketAsync(string recipient, string type, string cipherPayload)
+    public async Task SendPacketAsync(string recipient, string type, string cipherPayload)
     {
         if (_webSocket == null || _webSocket.State != WebSocketState.Open || _privateIdentityKey == null) return;
 
         var packet = new SignedPacket { Sender = Username.ToLower().Trim(), Recipient = recipient.ToLower().Trim(), Type = type, PayloadCipherBase64 = cipherPayload };
 
-        var rawDataToSign = new { s = packet.Sender, r = packet.Recipient, t = packet.Type, p = packet.PayloadCipherBase64 };
-        byte[] dataToSign = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(rawDataToSign));
+        string rawStringToSign = $"{packet.Sender}|{packet.Recipient}|{packet.Type}|{packet.PayloadCipherBase64}";
+        byte[] dataToSign = Encoding.UTF8.GetBytes(rawStringToSign);
 
         using var privateKey = Key.Import(SignatureAlgorithm.Ed25519, _privateIdentityKey, KeyBlobFormat.RawPrivateKey);
         packet.Signature = Convert.ToBase64String(SignatureAlgorithm.Ed25519.Sign(privateKey, dataToSign));
@@ -325,7 +441,7 @@ public class CryptoChatService
     }
 
     #region AES-GCM Engine
-    private string EncryptAesGcm(string plainText, byte[] key)
+    public string EncryptAesGcm(string plainText, byte[] key)
     {
         using var aes = new AesGcm(key, 16);
         byte[] nonce = new byte[12]; RandomNumberGenerator.Fill(nonce);
@@ -352,12 +468,81 @@ public class CryptoChatService
     }
     #endregion
 
+    public async Task DistributeGroupKeysAsync(Guid groupId, string groupName, List<string> members, byte[] groupMasterKey, LocalSecureStorage storage)
+    {
+        foreach (var member in members)
+        {
+            if (string.Equals(member, Username, StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                await InitializeE2EEChannelWithAsync(member, storage);
+
+                byte[] sessionKey = GetSharedKeyForUser(member, storage);
+
+                using var aes = new AesGcm(sessionKey, 16);
+                byte[] nonce = new byte[12];
+                RandomNumberGenerator.Fill(nonce);
+
+                byte[] ciphertext = new byte[groupMasterKey.Length];
+                byte[] tag = new byte[16];
+
+                aes.Encrypt(nonce, groupMasterKey, ciphertext, tag);
+
+                byte[] packetBytes = new byte[nonce.Length + tag.Length + ciphertext.Length];
+                Buffer.BlockCopy(nonce, 0, packetBytes, 0, nonce.Length);
+                Buffer.BlockCopy(tag, 0, packetBytes, nonce.Length, tag.Length);
+                Buffer.BlockCopy(ciphertext, 0, packetBytes, nonce.Length + tag.Length, ciphertext.Length);
+
+                string encryptedKeyBase64 = Convert.ToBase64String(packetBytes);
+
+                var keyPacket = new GroupKeyPacket
+                {
+                    GroupId = groupId,
+                    GroupName = groupName,
+                    Creator = Username,
+                    EncryptedGroupKeyBase64 = encryptedKeyBase64
+                };
+
+                string jsonPayload = System.Text.Json.JsonSerializer.Serialize(keyPacket);
+
+                // ИСПРАВЛЕНО: ОСТАВЛЯЕМ ТОЛЬКО ЭТОТ ОДИН ВАЛИДНЫЙ СЕТЕВОЙ ВЫЗОВ!
+                // ВСЁ, ЧТО ШЛО НИЖЕ ЭТОЙ СТРОКИ (networkMessage и _webSocket.SendAsync) — ПОЛНОСТЬЮ УДАЛИТЕ!
+                await SendPacketAsync(member, "GROUP_KEY_DISTRIBUTION", jsonPayload);
+
+                Console.WriteLine($"[ГРУППА] Ключ для {member} успешно отправлен в сеть.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ГРУППА] Не удалось отправить ключ для {member}: {ex.Message}");
+            }
+        }
+    }
+
+    // ИСПРАВЛЕНО: Метод теперь считывает сессионный ключ X3DH напрямую из LiteDB, 
+    // избегая ошибок обращения к закрытым внутренним словарям памяти!
+    private byte[] GetSharedKeyForUser(string username, LocalSecureStorage storage)
+    {
+        // Запрашиваем ключ общения с пользователем из базы данных. 
+        // В вашей архитектуре этот метод в storage может называться GetE2EKey или GetSharedSecret.
+        // Если метод называется по-другому, мы можем прочитать коллекцию напрямую:
+        // Формируем уникальный идентификатор ключа сессии с этим другом
+        var target = username.ToLower().Trim();
+
+        if (_activeChatKeys.TryGetValue(target, out var sessionKey))
+        {
+            return sessionKey;
+        }
+
+        throw new Exception($"Криптографический ключ X3DH сессии для пользователя {target} не найден в ОЗУ.");
+    }
+
     private class PrekeyBundleDto 
-    { 
-        public string Username { get; set; } = ""; 
-        public string Ed25519PublicKey { get; set; } = ""; 
-        public string EcdhIdentityKey { get; set; } = ""; 
-        public string SignedPrekey { get; set; } = ""; 
-        public string OneTimePrekey { get; set; } = ""; 
+    {
+        public string Username { get; set; } = "";
+        public string Ed25519PublicKey { get; set; } = "";
+        public string EcdhIdentityKey { get; set; } = "";
+        public string SignedPrekey { get; set; } = "";
+        public string OneTimePrekey { get; set; } = "";
     }
 }
