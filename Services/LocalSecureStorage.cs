@@ -275,7 +275,7 @@ public class LocalSecureStorage
         var col = _database.GetCollection<LocalGroupKeyInfo>("group_keys");
 
         // ИСПРАВЛЕНО: Безопасно вычищаем префикс "Группа:" прямо внутри хранилища
-        var normalizedName = groupName.Replace("Группа:", "").Replace("Группа", "").ToLower().Trim();
+        var normalizedName = groupName.Replace("Группа:", "").Replace("группа:", "").ToLower().Trim();
 
         var keyInfo = col.FindOne(x => x.GroupName.ToLower() == normalizedName);
         return keyInfo?.AESGroupKey;
