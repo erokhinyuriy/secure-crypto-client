@@ -11,8 +11,8 @@
    <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Width="360">
         
         <!-- Карточка формы входа с красивым скруглением и матовым фоном -->
-        <Border Background="#17212B" 
-                BorderBrush="#24303F" 
+        <Border Background="#0F0F1A" 
+                BorderBrush="#181824" 
                 BorderThickness="1" 
                 CornerRadius="12" 
                 Padding="25,30">
@@ -31,29 +31,42 @@
                            FontSize="22" 
                            FontWeight="Bold"
                            HorizontalAlignment="Center"
-                           Foreground="White"
+                           Foreground="#F1F0FF"
                            Margin="0,0,0,10"/>
                 
                 <!-- Поле ввода Логина (РУСИФИЦИРОВАНО) -->
+                <!-- Поле ввода Логина -->
                 <TextBox x:Name="UsernameBox" 
                          Watermark="Имя пользователя"
                          Text="{Binding Username}"
-                         Foreground="White" Background="#24303F"
-                         BorderThickness="0" CornerRadius="6" Padding="12,10"/>
-                
-                <!-- Поле ввода Мастер-пароля (РУСИФИЦИРОВАНО) -->
+                         Foreground="{DynamicResource TextBoxForeground}"
+                         Background="{DynamicResource TextBoxBackground}"
+                         BorderBrush="{DynamicResource TextBoxBorderBrush}"
+                         BorderThickness="1.5"
+                         CornerRadius="6" 
+                         Padding="12,10"
+                         FontSize="14"/>
+
+                <!-- Поле ввода Пароля -->
                 <TextBox x:Name="PasswordBox" 
                          PasswordChar="●"
                          Watermark="Мастер-пароль"
                          Text="{Binding MasterPassword}"
-                         Foreground="White" Background="#24303F"
-                         BorderThickness="0" CornerRadius="6" Padding="12,10"/>
+                         Foreground="{DynamicResource TextBoxForeground}"
+                         Background="{DynamicResource TextBoxBackground}"
+                         BorderBrush="{DynamicResource TextBoxBorderBrush}"
+                         BorderThickness="1.5"
+                         CornerRadius="6" 
+                         Padding="12,10"
+                         FontSize="14"/>
                 
                 <!-- Галочка "Запомнить меня" (РУСИФИЦИРОВАНО) -->
                 <CheckBox x:Name="RememberCheckbox" 
                           Content="Запомнить меня на этом устройстве"
                           IsChecked="{Binding RememberMe}"
-                          Foreground="#7F91A4" FontSize="13" Margin="2,0,0,10"/>
+                          Foreground="{DynamicResource CheckBoxForeground}"
+                          FontSize="13" 
+                          Margin="2,0,0,10"/>
                 
                 <!-- Главная кнопка Входа (РУСИФИЦИРОВАНО) -->
                 <Button x:Name="LoginButton" 
@@ -62,7 +75,7 @@
                         Content="Войти"
                         Width="310" Height="42"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                        Background="#5288C1" Foreground="White"
+                        Background="#6366F1" Foreground="White"
                         FontWeight="SemiBold" FontSize="14"
                         CornerRadius="6"/>
                 
@@ -73,7 +86,7 @@
                         Content="Нет учетной записи? Зарегистрироваться"
                         Width="310" Height="32"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                        Background="Transparent" Foreground="#5288C1"
+                        Background="Transparent" Foreground="#8184FF"
                         FontSize="13" CornerRadius="6"/>
                 
                 <!-- Сообщение об ошибке -->

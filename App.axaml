@@ -12,4 +12,63 @@
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>
+
+    <Application.Resources>
+
+    <!-- === Цвета для CheckBox в Indigo теме === -->
+
+    <!-- Текст -->
+    <SolidColorBrush x:Key="CheckBoxForeground" Color="#B4B3D0" />
+    <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPointerOver" Color="#E0DFFF" />
+    <SolidColorBrush x:Key="CheckBoxForegroundCheckedPointerOver" Color="#FFFFFF" />
+
+    <!-- Неотмеченный (Unchecked) -->
+    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundUnchecked" Color="#6366F1" />
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#2A2A3F" />
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#8184FF" />
+
+    <!-- Отмеченный (Checked) -->
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#6366F1" />
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#6366F1" />
+    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#FFFFFF" />
+
+    <!-- Hover на отмеченном (самое важное для твоей проблемы) -->
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#8184FF" />
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#6366F1" />
+    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#FFFFFF" />
+
+    <!-- Pressed (по желанию) -->
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#4F46E5" />
+    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#FFFFFF" />
+
+    <!-- ==================== TextBox ==================== -->
+
+    <!-- Основные состояния -->
+    <SolidColorBrush x:Key="TextBoxBackground" Color="#1F1F2E" />
+    <SolidColorBrush x:Key="TextBoxBackgroundPointerOver" Color="#25253A" />
+    <SolidColorBrush x:Key="TextBoxBackgroundFocused" Color="#1F1F2E" />
+
+    <!-- Обводка обычная -->
+    <SolidColorBrush x:Key="TextBoxBorderBrush" Color="#2A2A3F" />
+
+    <!-- Hover -->
+    <SolidColorBrush x:Key="TextBoxBorderBrushPointerOver" Color="#6366F1" />
+
+    <!-- Focused (самое важное сейчас) -->
+    <SolidColorBrush x:Key="TextBoxBorderBrushFocused" Color="#8184FF" />
+
+    <!-- Дополнительные ресурсы для фокусной рамки -->
+    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#8184FF" />
+    <SolidColorBrush x:Key="TextBoxFocusBorderBrush" Color="#8184FF" />
+
+    <!-- Градиент для отправленных сообщений -->
+    <LinearGradientBrush x:Key="SentMessageGradient" StartPoint="0%,0%" EndPoint="100%,100%">
+        <GradientStop Color="#6366F1" Offset="0.0"/>
+        <GradientStop Color="#4F46E5" Offset="0.7"/>
+        <GradientStop Color="#4338CA" Offset="1.0"/>
+    </LinearGradientBrush>
+
+    <SolidColorBrush x:Key="SentMessageBorder" Color="#8184FF" Opacity="0.6"/>
+
+</Application.Resources>
 </Application>

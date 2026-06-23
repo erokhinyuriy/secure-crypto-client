@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Notifications;
+using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using SecureCryptoClient.ViewModels;
 using SecureCryptoClient.Views;
+using System.Diagnostics;
 
 namespace SecureCryptoClient
 {
@@ -44,16 +46,23 @@ namespace SecureCryptoClient
                     {
                         if (mainVm.CurrentContent is MainChatViewModel)
                         {
-                            mainWindow.Width = 850;
-                            mainWindow.Height = 600;
+                            mainWindow.Width = 1024;
+                            mainWindow.Height = 700;
+                            mainWindow.WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterScreen;
                         }
-                        else if (mainVm.CurrentContent is AuthViewModel)
+                        if (mainVm.CurrentContent is AuthViewModel)
                         {
                             mainWindow.Width = 400;
                             mainWindow.Height = 550;
                         }
                     }
                 };
+
+                if (mainVm.CurrentContent is AuthViewModel)
+                {
+                    mainWindow.Width = 400;
+                    mainWindow.Height = 520;
+                }
 
                 desktop.MainWindow = mainWindow;
             }
